@@ -120,13 +120,36 @@
       outline: none;
     }
 
+    .submit-btn {
+      width: 160px;
+      padding: 10px;
+      font-size: 18px;
+      font-family: Georgia, "Times New Roman", serif;
+      background-color: #000;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      margin-top: 10px;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+      transition: 0.2s ease;
+    }
+
+    .submit-btn:hover {
+      transform: scale(1.05);
+    } 
+
+    .submit-btn:active {
+      transform: scale(0.95);
+    }
+
     .contact-form input {
       height: 30px;
       max-width: 360px;
     }
 
     .contact-form textarea {
-      height: 160px;
+      height: 100px;
       resize: none;
       max-width: 520px;
     }
@@ -280,6 +303,7 @@
             <input type="email" placeholder="Email" />
             <input type="text" placeholder="Subject" />
             <textarea placeholder="Message"></textarea>
+            <button type="submit" class="submit-btn">Submit</button>
           </form>
         </div>
       </div>

@@ -1,20 +1,26 @@
-# main.py
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import random
 
-app = FastAPI()
+from backend.routes.predict import router as predict_router
+
+app = FastAPI(title="GINGIGAGE Backend API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # change in production
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.post("/predict")
-async def predict(image: UploadFile = File(...)):
-    return {
-        "kg_width_mm": round(random.uniform(3.0, 6.0), 2),
-        "confidence_score": 0.93
-    }
+app.include_router(predict_router)
+
+
+@app.get("/")
+def root():
+    return {"message": "GINGIGAGE backend is running"}
+
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}

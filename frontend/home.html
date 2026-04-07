@@ -31,7 +31,6 @@
       align-items: center;
       padding: 10px 40px;
       height: 126px;
-
     }
 
     .logo {
@@ -50,7 +49,6 @@
       background-color: #ededed;
       color: #111;
       padding: 12px 18px;
-      /* padding: 10px; */
       border-radius: 8px;
       font-size: 16px;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
@@ -120,9 +118,99 @@
       color: #111;
     }
 
+    /* Upload Popup */
+    .upload-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background-color: rgba(0, 0, 0, 0.35);
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+
+    .upload-modal-content {
+      width: 360px;
+      background-color: #ffffff;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      position: relative;
+      text-align: center;
+    }
+
+    .upload-modal-content h2 {
+      margin-bottom: 10px;
+      font-size: 24px;
+    }
+
+    .upload-modal-content p {
+      margin-bottom: 16px;
+      color: #666;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .close-upload {
+      position: absolute;
+      top: 10px;
+      right: 14px;
+      border: none;
+      background: transparent;
+      font-size: 24px;
+      cursor: pointer;
+      color: #666;
+    }
+
+    .file-input {
+      width: 100%;
+      margin: 10px 0 12px;
+      font-size: 14px;
+    }
+
+    .selected-file {
+      min-height: 20px;
+      font-size: 14px;
+      color: #444;
+      margin-bottom: 18px;
+      word-break: break-word;
+    }
+
+    .upload-modal-actions {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .modal-btn {
+      border: none;
+      border-radius: 10px;
+      padding: 10px 18px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: 0.2s ease;
+    }
+
+    .modal-btn:hover {
+      transform: scale(1.04);
+    }
+
+    .modal-btn:active {
+      transform: scale(0.97);
+    }
+
+    .cancel-btn {
+      background-color: #dddddd;
+      color: #111;
+    }
+
+    .confirm-btn {
+      background-color: #000;
+      color: #fff;
+    }
+
     /* Info section */
     .info-section {
-      /* background-color: #CACACA;  */
       background-color: #e9e9e9;
       padding: 64px 70px 40px;
     }
@@ -158,7 +246,7 @@
     }
 
     .read-more {
-      display: flex;          /* ← key change */
+      display: flex;
       background-color: #666;
       color: #fff;
       border: none;
@@ -170,15 +258,15 @@
       box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
     }
 
-    .read-more:hover{
+    .read-more:hover {
       transform: scale(1.05);
-    } 
+    }
 
-    .read-more:active{
+    .read-more:active {
       transform: scale(0.95);
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
     }
-    
+
     .image-card {
       flex: 1;
       display: flex;
@@ -268,6 +356,10 @@
       .footer {
         font-size: 15px;
       }
+
+      .upload-modal-content {
+        width: 90%;
+      }
     }
   </style>
 </head>
@@ -285,10 +377,24 @@
       <h1>GINGIGAUGE</h1>
       <p>Deep-learning Based Measurement of KGW</p>
       <div class="hero-actions">
-        <button class="btn btn-dark">Upload</button>
-        <button class="btn btn-light">Measure</button>
+        <button class="btn btn-dark" id="openUploadPopup">Upload</button>
       </div>
     </section>
+
+    <!-- Upload Popup -->
+    <div class="upload-modal" id="uploadModal">
+      <div class="upload-modal-content">
+        <button class="close-upload" id="closeUploadPopup">&times;</button>
+        <h2>Upload File</h2>
+        <p>Select an image from your local drive.</p>
+        <input type="file" id="fileInput" class="file-input" accept="image/*" />
+        <div class="selected-file" id="selectedFileName">No file selected</div>
+        <div class="upload-modal-actions">
+          <button class="modal-btn cancel-btn" id="cancelUpload">Cancel</button>
+          <button class="modal-btn confirm-btn" id="confirmUpload">Measure</button>
+        </div>
+      </div>
+    </div>
 
     <section class="info-section">
       <div class="info-content">
@@ -313,5 +419,58 @@
       A collaborative project between the Faculty of Engineering and the Faculty of Dentistry, Chulalongkorn University
     </footer>
   </div>
+
+  <script>
+    const openUploadPopup = document.getElementById("openUploadPopup");
+    const closeUploadPopup = document.getElementById("closeUploadPopup");
+    const cancelUpload = document.getElementById("cancelUpload");
+    const confirmUpload = document.getElementById("confirmUpload");
+    const uploadModal = document.getElementById("uploadModal");
+    const fileInput = document.getElementById("fileInput");
+    const selectedFileName = document.getElementById("selectedFileName");
+
+    openUploadPopup.addEventListener("click", () => {
+      uploadModal.style.display = "flex";
+    });
+
+    function closeModal() {
+      uploadModal.style.display = "none";
+    }
+
+    closeUploadPopup.addEventListener("click", closeModal);
+    cancelUpload.addEventListener("click", closeModal);
+
+    uploadModal.addEventListener("click", (e) => {
+      if (e.target === uploadModal) {
+        closeModal();
+      }
+    });
+
+    fileInput.addEventListener("change", () => {
+      if (fileInput.files.length > 0) {
+        selectedFileName.textContent = "Selected: " + fileInput.files[0].name;
+      } else {
+        selectedFileName.textContent = "No file selected";
+      }
+    });
+
+    confirmUpload.addEventListener("click", async () => {
+      if (fileInput.files.length === 0) {
+        alert("Please select a file first.");
+        return;
+      }
+
+    const formData = new FormData();
+    formData.append("file", fileInput.files[0]);
+
+    const response = await fetch("http://localhost:8000/upload", {
+      method: "POST",
+      body: formData
+    });
+
+    const result = await response.json();
+    alert("Uploaded: " + result.filename);
+    });
+  </script>
 </body>
 </html>
