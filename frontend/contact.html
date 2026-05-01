@@ -3,61 +3,65 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GINGIGAGUE - Contact</title>
+  <title>GINGIGAUGE - Contact</title>
   <link rel="stylesheet" href="style.css" />
 </head>
-<body>
-  <div class="page">
-    <header class="navbar">
-      <div class="logo">GINGIGAUGE</div>
-      <nav class="nav-buttons">
-        <a href="index.html">Home</a>
-        <a href="about.html">About Us</a>
-      </nav>                  
+<body class="min-h-screen bg-slate-50 text-slate-900">
+  <div class="flex min-h-screen flex-col">
+    <header class="flex items-center justify-between bg-white px-6 py-4 shadow-sm md:px-12">
+      <div class="text-xl font-bold tracking-wide text-black">GINGIGAUGE</div>
+      <nav class="flex items-center gap-3">
+        <a href="index.html" class="rounded-md border border-black px-4 py-2 text-sm font-semibold text-black transition hover:bg-black hover:text-white">Home</a>
+        <a href="about.html" class="rounded-md border border-black px-4 py-2 text-sm font-semibold text-black transition hover:bg-black hover:text-white">About Us</a>
+      </nav>
     </header>
 
-    <section class="contact-top">
-      <div class="contact-image">
-        <img src="images/Smile.png" alt="Smiling teeth">
-      </div>
+    <main class="flex-1">
+      <section class="bg-slate-50 px-6 py-16">
+        <!-- <div class="mx-auto grid max-w-6xl items-center gap-10 md:grid-cols-2"> -->
+          <!-- <div class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            <img class="h-full w-full object-cover" src="images/Smile.png" alt="Smiling teeth">
+          </div> -->
 
-      <div class="contact-form-wrapper">
-        <div class="contact-form-box">
-          <h1>Contact Us</h1>
+          <div class="mx-auto min-h-[520px] w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+            <h1 class="text-4xl font-extrabold tracking-wide text-black md:text-5xl">Contact Us</h1>
 
-          <form class="contact-form">
-            <input type="text" placeholder="First Name" />
-            <input type="text" placeholder="Last Name" />
-            <input type="email" placeholder="Email" />
-            <input type="text" placeholder="Subject" />
-            <textarea placeholder="Message"></textarea>
-            <button type="submit" class="submit-btn">Submit</button>
-          </form>
+            <form class="mt-8 grid gap-4">
+              <input class="w-full rounded-md border border-slate-300 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-black focus:ring-2 focus:ring-black/10" type="text" placeholder="First Name" />
+              <input class="w-full rounded-md border border-slate-300 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-black focus:ring-2 focus:ring-black/10" type="text" placeholder="Last Name" />
+              <input class="w-full rounded-md border border-slate-300 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-black focus:ring-2 focus:ring-black/10" type="email" placeholder="Email" />
+              <input class="w-full rounded-md border border-slate-300 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-black focus:ring-2 focus:ring-black/10" type="text" placeholder="Subject" />
+              <textarea class="min-h-32 w-full resize-none rounded-md border border-slate-300 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-black focus:ring-2 focus:ring-black/10" placeholder="Message"></textarea>
+              <button type="submit" class="mt-2 w-fit rounded-md bg-black px-6 py-3 font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2">Submit</button>
+            </form>
+          </div>
+        <!-- </div> -->
+      </section>
+
+      <section class="bg-white px-6 py-16">
+        <div class="mx-auto grid max-w-6xl gap-8 md:grid-cols-2">
+          <div class="rounded-lg border border-slate-200 bg-slate-50 p-6 shadow-sm">
+            <h2 class="text-2xl font-bold text-black">Address</h2>
+            <p class="mt-4 leading-8 text-slate-600">
+              Faculty of Engineering, Chulalongkorn University,<br>
+              Phayathai Road<br>
+              Pathumwan, Bangkok, Thailand 10330
+            </p>
+          </div>
+
+          <div class="rounded-lg border border-slate-200 bg-slate-50 p-6 shadow-sm">
+            <h2 class="text-2xl font-bold text-black">Channels</h2>
+            <p class="mt-4 leading-8 text-slate-600">
+              Email : gingigauge.inquiry@gmail.com,<br>
+              Facebook : gingigauge.official<br>
+              Instagram : gingigauge.official
+            </p>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </main>
 
-    <section class="contact-bottom">
-      <div class="info-block">
-        <h2>Address</h2>
-        <p>
-          Faculty of Engineering, Chulalongkorn University,<br>
-          Phayathai Road<br>
-          Pathumwan, Bangkok, Thailand 10330
-        </p>
-      </div>
-
-      <div class="info-block">
-        <h2>Contact Channels</h2>
-        <ul class="channels-list">
-          <li>Email : gingigage.inquiry@gmail.com</li>
-          <li>Facebook : gingigage.official</li>
-          <li>Instagram : gingigage.official</li>
-        </ul>
-      </div>
-    </section>
-
-    <footer class="footer">
+    <footer class="bg-black px-6 py-5 text-center text-sm text-white">
       A collaborative project between the Faculty of Engineering and the Faculty of Dentistry, Chulalongkorn University
     </footer>
   </div>
