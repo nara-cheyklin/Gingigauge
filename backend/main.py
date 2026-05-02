@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from backend.routes.predict import router as predict_router
 from backend.routes.contact import router as contact_router
 
-app = FastAPI(title="Gingigage API")
+app = FastAPI(title="Gingigauge API")
 
 app.add_middleware(
     CORSMiddleware,

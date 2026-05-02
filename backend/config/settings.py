@@ -5,8 +5,6 @@ load_dotenv()
 
 # settings.py
 
-MODEL_PATH = "model.pth"
-
 GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID")
 GCP_REGION = os.getenv("GCP_REGION")
 GCP_ENDPOINT_ID = os.getenv("GCP_ENDPOINT_ID")
@@ -38,3 +36,4 @@ CAMERA_INTRINSICS = {
 # If depth image is uint16 in millimeters, use 1.0
 # If depth is in meters, use 1000.0 when converting to mm
 DEPTH_UNIT_SCALE = 1.0
+ROBOFLOW_API_KEY = "AJsHVIAWkG50GbTG9Uv4"

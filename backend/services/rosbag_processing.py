@@ -1,7 +1,6 @@
 import numpy as np
 import cv2
-from rosbags.rosbag2 import Reader
-from rosbags.typesys import get_typestore, Stores
+from rosbags.rosbag1 import Reader
 
 
 def ros_image_to_cv2(msg):
@@ -25,14 +24,13 @@ def extract_rgb_and_depth_from_rosbag(
     rgb_topic: str = "/camera/color/image_raw",
     depth_topic: str = "/camera/aligned_depth_to_color/image_raw"
 ):
-    typestore = get_typestore(Stores.ROS2_HUMBLE)
     rgb_frame = None
     depth_frame = None
 
     with Reader(bag_path) as reader:
         connections = [c for c in reader.connections if c.topic in (rgb_topic, depth_topic)]
         for connection, _, rawdata in reader.messages(connections=connections):
-            msg = typestore.deserialize_cdr(rawdata, connection.msgtype)
+            msg = reader.typestore.deserialize_ros1(rawdata, connection.msgtype)
             if connection.topic == rgb_topic and rgb_frame is None:
                 rgb_frame = ros_image_to_cv2(msg)
             elif connection.topic == depth_topic and depth_frame is None:

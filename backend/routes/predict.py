@@ -4,7 +4,8 @@ import os
 
 from backend.config.settings import ALLOWED_FILE_TYPES, ALLOWED_IMAGE_FILE_TYPES
 from backend.services.rosbag_processing import extract_rgb_and_depth_from_rosbag, cv2_to_bytes
-from backend.services.inference import run_inference, run_inference_rgb_only
+from backend.services.inference import run_inference_rgb_only
+from backend.services.full_pipeline import run_full_pipeline
 
 router = APIRouter()
 
@@ -50,7 +51,7 @@ async def predict_rosbag(file: UploadFile = File(...)):
 
         image_bytes = cv2_to_bytes(rgb_frame)
 
-        result = run_inference(
+        result = run_full_pipeline(
             image_bytes=image_bytes,
             depth_map=depth_frame
         )
