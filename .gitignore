@@ -1,1 +1,7 @@
 node_modules/
+venv/
+.env
+sample_image/
+test.py
+__pycache__/
+*.py[cod]

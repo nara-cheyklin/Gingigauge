@@ -7,3 +7,5 @@ numpy
 opencv-python-headless
 Pillow
 rosbags
+google-cloud-aiplatform
+python-dotenv

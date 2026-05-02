@@ -17,7 +17,7 @@ function initExport(imageSrc, resultData) {
     const confidenceValue = document.getElementById("confidenceValue");
     const interpretationValue = document.getElementById("interpretationValue");
 
-    if (kgwValue) kgwValue.textContent = resultData.kgw_mm + " mm";
+    if (kgwValue) kgwValue.textContent = formatKgw(resultData.kgw_mm);
     if (confidenceValue) confidenceValue.textContent = (resultData.confidence * 100).toFixed(1) + "%";
     if (interpretationValue) interpretationValue.textContent = resultData.interpretation;
   }
@@ -44,7 +44,7 @@ function printResult(imageSrc, resultData) {
   const printWindow = window.open("", "_blank");
 
   const rows = resultData ? `
-    <tr><th>KGW Measurement</th><td>${resultData.kgw_mm} mm</td></tr>
+    <tr><th>KGW Measurement</th><td>${formatKgw(resultData.kgw_mm)}</td></tr>
     <tr><th>Confidence</th><td>${(resultData.confidence * 100).toFixed(1)}%</td></tr>
     <tr><th>Interpretation</th><td>${resultData.interpretation}</td></tr>
   ` : "";
@@ -94,4 +94,8 @@ function getTimestamp() {
     String(d.getHours()).padStart(2, "0") +
     String(d.getMinutes()).padStart(2, "0") +
     String(d.getSeconds()).padStart(2, "0");
+}
+
+function formatKgw(kgw) {
+  return typeof kgw === "number" ? kgw + " mm" : kgw;
 }

@@ -1,11 +1,27 @@
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # settings.py
 
 MODEL_PATH = "model.pth"
+
+GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID")
+GCP_REGION = os.getenv("GCP_REGION")
+GCP_ENDPOINT_ID = os.getenv("GCP_ENDPOINT_ID")
+GCP_ENDPOINT_IMAGE_MAX_SIZE = int(os.getenv("GCP_ENDPOINT_IMAGE_MAX_SIZE", "0"))
 
 ALLOWED_FILE_TYPES = [
     "application/octet-stream",
     "application/x-bag"
 ]
+
+ALLOWED_IMAGE_FILE_TYPES = {
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+}
 
 KGW_THRESHOLD_MM = 2.0
 

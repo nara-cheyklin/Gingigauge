@@ -1,53 +1,68 @@
 import base64
-import torch
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
+from google.cloud import aiplatform
 
-from backend.config.settings import MODEL_PATH, KGW_THRESHOLD_MM, CAMERA_INTRINSICS, DEPTH_UNIT_SCALE
+from backend.config.settings import (
+    CAMERA_INTRINSICS,
+    DEPTH_UNIT_SCALE,
+    GCP_ENDPOINT_ID,
+    GCP_ENDPOINT_IMAGE_MAX_SIZE,
+    GCP_PROJECT_ID,
+    GCP_REGION,
+    KGW_THRESHOLD_MM,
+)
+
+_endpoint = None
+
+def get_endpoint():
+    global _endpoint
+
+    if _endpoint is None:
+        aiplatform.init(project=GCP_PROJECT_ID, location=GCP_REGION)
+        _endpoint = aiplatform.Endpoint(
+            endpoint_name=(
+                f"projects/{GCP_PROJECT_ID}/locations/{GCP_REGION}/"
+                f"endpoints/{GCP_ENDPOINT_ID}"
+            )
+        )
+
+    return _endpoint
 
 
-# -------------------------------
-# Dummy model
-# Replace later with your real model
-# -------------------------------
-class DummyModel:
-    def eval(self):
-        pass
-
-    def __call__(self, x):
-        # Fake mask for testing
-        return torch.rand((1, 1, 256, 256))
-
-
-model = DummyModel()
-
-try:
-    state_dict = torch.load(MODEL_PATH, map_location="cpu")
-    model.load_state_dict(state_dict)
-    model.eval()
-except Exception:
-    model = DummyModel()
-
-
-# -------------------------------
-# Preprocess RGB image
-# -------------------------------
-def preprocess(image_bytes):
+def image_bytes_to_endpoint_b64(image_bytes):
     image = Image.open(BytesIO(image_bytes)).convert("RGB")
-    original_size = image.size  # (width, height)
 
-    image = image.resize((256, 256))
-    image_np = np.array(image) / 255.0
-    image_np = np.transpose(image_np, (2, 0, 1))
-    tensor = torch.tensor(image_np, dtype=torch.float32).unsqueeze(0)
+    if GCP_ENDPOINT_IMAGE_MAX_SIZE:
+        image.thumbnail((GCP_ENDPOINT_IMAGE_MAX_SIZE, GCP_ENDPOINT_IMAGE_MAX_SIZE))
 
-    return tensor, original_size
+    buffer = BytesIO()
+    image.save(buffer, format="JPEG", quality=85)
+    return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
-# -------------------------------
-# Resize mask back to original image size
-# -------------------------------
+def prediction_to_mask(prediction):
+    if "mask_b64" not in prediction:
+        raise RuntimeError("Vertex AI prediction did not include mask_b64")
+
+    mask_bytes = base64.b64decode(prediction["mask_b64"])
+    mask_img = Image.open(BytesIO(mask_bytes)).convert("L")
+    mask_np = np.array(mask_img)
+
+    return (mask_np > 127).astype(np.uint8)
+
+
+def predict_mask_with_endpoint(image_bytes):
+    endpoint = get_endpoint()
+    image_b64 = image_bytes_to_endpoint_b64(image_bytes)
+    response = endpoint.predict(instances=[{"b64": image_b64}])
+
+    if not response.predictions:
+        raise RuntimeError("Vertex AI endpoint returned no predictions")
+
+    return prediction_to_mask(response.predictions[0])
+
 def resize_mask_to_original(mask, original_size):
     mask_img = Image.fromarray((mask * 255).astype(np.uint8))
     mask_img = mask_img.resize(original_size, Image.NEAREST)
@@ -135,6 +150,29 @@ def confidence_logic(mask):
     return round(float(np.mean(mask)), 2)
 
 
+def mask_to_base64_png(binary_mask):
+    mask_img = Image.fromarray((binary_mask * 255).astype(np.uint8))
+    buffer = BytesIO()
+    mask_img.save(buffer, format="PNG")
+    return base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+
+def overlay_mask_on_image(image_bytes, binary_mask):
+    image = Image.open(BytesIO(image_bytes)).convert("RGBA")
+    mask_img = Image.fromarray((binary_mask * 255).astype(np.uint8)).resize(image.size, Image.NEAREST)
+
+    overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
+    overlay_pixels = np.array(overlay)
+    mask_pixels = np.array(mask_img) > 127
+    overlay_pixels[mask_pixels] = [0, 200, 255, 110]
+    overlay = Image.fromarray(overlay_pixels, mode="RGBA")
+
+    combined = Image.alpha_composite(image, overlay).convert("RGB")
+    buffer = BytesIO()
+    combined.save(buffer, format="JPEG", quality=90)
+    return base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+
 # -------------------------------
 # Draw measurement annotations on the original image and return as base64 JPEG
 # -------------------------------
@@ -173,20 +211,39 @@ def annotate_image(image_bytes, point_1, point_2, kgw_mm):
 
 
 # -------------------------------
-# Main inference
+# RGB-only inference for testing the deployed segmentation endpoint
+# -------------------------------
+def run_inference_rgb_only(image_bytes):
+    image = Image.open(BytesIO(image_bytes)).convert("RGB")
+    original_size = image.size  # (width, height)
+    binary_mask_small = predict_mask_with_endpoint(image_bytes)
+    binary_mask = resize_mask_to_original(binary_mask_small, original_size)
+
+    return {
+        "confidence": confidence_logic(binary_mask),
+        "image_size": {
+            "width": original_size[0],
+            "height": original_size[1]
+        },
+        "mask_size": {
+            "width": binary_mask.shape[1],
+            "height": binary_mask.shape[0]
+        },
+        "mask_base64": mask_to_base64_png(binary_mask),
+        "image_base64": overlay_mask_on_image(image_bytes, binary_mask)
+    }
+
+
+# -------------------------------
+# Main inference with RGB + depth
 # depth_map must already be aligned to RGB
 # -------------------------------
 def run_inference(image_bytes, depth_map):
-    input_tensor, original_size = preprocess(image_bytes)
-
-    with torch.no_grad():
-        output = model(input_tensor)
-
-    mask = output.squeeze().cpu().numpy()
-    binary_mask_small = (mask > 0.5).astype(np.uint8)
-
-    # Resize segmentation result to original RGB size
-    binary_mask = resize_mask_to_original(binary_mask_small, original_size)
+    image = Image.open(BytesIO(image_bytes)).convert("RGB")
+    original_size = image.size  # (width, height)
+    rgb_result = run_inference_rgb_only(image_bytes)
+    mask_bytes = base64.b64decode(rgb_result["mask_base64"])
+    binary_mask = (np.array(Image.open(BytesIO(mask_bytes)).convert("L")) > 127).astype(np.uint8)
 
     # depth_map should match original RGB size
     if depth_map.shape[:2] != (original_size[1], original_size[0]):
@@ -201,7 +258,7 @@ def run_inference(image_bytes, depth_map):
         depth_scale=DEPTH_UNIT_SCALE
     )
 
-    confidence = confidence_logic(mask)
+    confidence = rgb_result["confidence"]
 
     interpretation = (
         "Adequate keratinized gingiva width"
