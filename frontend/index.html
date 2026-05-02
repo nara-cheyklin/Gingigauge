@@ -6,80 +6,110 @@
   <title>GINGIGAUGE</title>
   <link rel="stylesheet" href="style.css" />
 </head>
-<body>
-  <div class="page">
-    <header class="navbar">
-      <div class="logo">GINGIGAUGE</div>
-      <div class="nav-buttons">
-        <a href="about.html" class="nav-btn">About Us</a>
-        <a href="contact.html" class="nav-btn">Contact</a>
+<body class="min-h-screen bg-slate-50 text-slate-900">
+  <div class="flex min-h-screen flex-col">
+    <header class="flex items-center justify-between bg-white px-6 py-4 shadow-sm md:px-12">
+      <div class="text-xl font-bold tracking-wide text-black">GINGIGAUGE</div>
+      <div class="flex items-center gap-3">
+        <a href="about.html" class="rounded-md border border-black px-4 py-2 text-sm font-semibold text-black transition hover:bg-black hover:text-white">About Us</a>
+        <a href="contact.html" class="rounded-md border border-black px-4 py-2 text-sm font-semibold text-black transition hover:bg-black hover:text-white">Contact</a>
       </div>
     </header>
 
-    <section class="hero">
-      <h1>GINGIGAUGE</h1>
-      <p>Deep-learning Based Measurement of KGW</p>
-      <div class="hero-actions">
-        <button class="btn btn-dark" id="openUploadPopup">Upload</button>
+    <section class="flex flex-1 flex-col items-center justify-center px-6 py-20 text-center">
+      <h1 class="text-5xl font-extrabold tracking-wide text-black md:text-7xl">GINGIGAUGE</h1>
+      <p class="mt-4 text-lg text-slate-600 md:text-2xl">Deep-learning Based Measurement of KGW</p>
+      <div class="mt-8">
+        <button class="rounded-md bg-black px-8 py-3 font-semibold text-white shadow-sm transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2" id="openUploadPopup">Upload</button>
       </div>
     </section>
 
     <!-- Upload Popup -->
-    <div class="upload-modal" id="uploadModal">
-      <div class="upload-modal-content">
-        <button class="close-upload" id="closeUploadPopup">&times;</button>
-        <h2>Upload File</h2>
-        <p>Select a ROS bag file (.bag) from your local drive.</p>
-        <input type="file" id="fileInput" class="file-input" accept=".bag,application/octet-stream,application/x-bag" />
-        <div class="selected-file" id="selectedFileName">No file selected</div>
-        <div class="upload-modal-actions">
-          <button class="modal-btn cancel-btn" id="cancelUpload">Cancel</button>
-          <button class="modal-btn confirm-btn" id="confirmUpload">Measure</button>
+    <div class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4" id="uploadModal">
+      <div class="relative w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+        <button class="absolute right-4 top-3 text-3xl leading-none text-slate-400 transition hover:text-slate-700" id="closeUploadPopup">&times;</button>
+        <h2 class="text-2xl font-bold text-slate-900">Upload File</h2>
+        <p class="mt-2 text-sm text-slate-600">Select an RGB image from your local drive.</p>
+        <input type="file" id="fileInput" class="mt-5 block w-full rounded-md border border-slate-300 text-sm text-slate-700 file:mr-4 file:border-0 file:bg-black file:px-4 file:py-2 file:font-semibold file:text-white hover:file:bg-slate-800" accept="image/png,image/jpeg,image/jpg"/>
+        <div class="mt-3 rounded-md bg-slate-100 px-3 py-2 text-sm text-slate-600" id="selectedFileName">No file selected</div>
+        <div id="selectedImagePreview" class="mt-4 hidden overflow-hidden rounded-md border border-slate-200 bg-slate-50">
+          <img id="selectedImage" src="" alt="Selected image preview" class="max-h-64 w-full object-contain" />
+        </div>
+        <div class="mt-6 flex justify-end gap-3">
+          <button class="rounded-md border border-slate-300 px-4 py-2 font-semibold text-slate-700 transition hover:bg-slate-100" id="cancelUpload">Cancel</button>
+          <button class="rounded-md bg-black px-4 py-2 font-semibold text-white transition hover:bg-slate-800" id="confirmUpload">Measure</button>
         </div>
       </div>
     </div>
 
-      <!-- Result + Export Panel -->
-  <div id="exportContainer" style="display:none; text-align:center; padding:20px;">
-    <img id="outputImage" src="" alt="KGW Result" style="max-width:100%; margin-bottom:16px;" />
-    <table style="margin:0 auto 16px; border-collapse:collapse;">
-      <tr><th style="padding:6px 12px; border:1px solid #ccc;">KGW</th>
-          <td id="kgwValue" style="padding:6px 12px; border:1px solid #ccc;"></td></tr>
-      <tr><th style="padding:6px 12px; border:1px solid #ccc;">Confidence</th>
-          <td id="confidenceValue" style="padding:6px 12px; border:1px solid #ccc;"></td></tr>
-      <tr><th style="padding:6px 12px; border:1px solid #ccc;">Interpretation</th>
-          <td id="interpretationValue" style="padding:6px 12px; border:1px solid #ccc;"></td></tr>
-    </table>
-    <button id="downloadBtn" class="btn btn-dark">Download (.jpg)</button>
-    <button id="printBtn" class="btn btn-dark" style="margin-left:8px;">Print</button>
-  </div>
-
-
-    <section class="info-section">
-      <div class="info-content">
-        <div class="info-text">
-          <h2>What is KGW?</h2>
-          <p>
-            KGW is a measurable band of strong gum tissue surrounding your teeth
-            and a key indicator of long-term oral health.
-          </p>
-          <div class="nav-buttons">
-            <a href="about.html" class="nav-btn">Read More</a>
+    <section id="exportContainer" class="hidden border-y border-slate-200 bg-white px-6 py-14">
+      <div class="mx-auto max-w-6xl">
+        <div class="mb-8 flex flex-col gap-4 text-left md:flex-row md:items-end md:justify-between">
+          <div>
+            <h2 class="mt-8 text-3xl font-bold text-black md:text-4xl">Measurement Result</h2>
+          </div>
+          <div class="flex gap-3">
+            <button id="downloadBtn" class="rounded-md bg-black px-5 py-2 font-semibold text-white transition hover:bg-slate-800">Download</button>
+            <button id="printBtn" class="rounded-md border border-black px-5 py-2 font-semibold text-black transition hover:bg-black hover:text-white">Print</button>
+            <button id="clearResultBtn" class="rounded-md border border-black px-5 py-2 font-semibold text-black transition hover:bg-black hover:text-white">Clear</button>
           </div>
         </div>
 
-        <div class="image-card">
-          <img src="images/KG.png" alt="KGW dental illustration">
+        <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+          <div class="overflow-hidden mt-3 rounded-lg border border-slate-200 bg-slate-50 shadow-sm">
+            <img id="outputImage" src="" alt="KGW Result" class="max-h-[72vh] w-full object-contain" />
+          </div>
+
+          <div class="rounded-lg border border-slate-200 bg-slate-50 p-5 shadow-sm">
+            <h3 class="text-left text-lg font-bold text-black">Summary</h3>
+            <div class="mt-5 space-y-3">
+              <div class="rounded-md border border-slate-200 bg-white p-4">
+                <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">KGW</div>
+                <div id="kgwValue" class="mt-1 text-2xl font-bold text-black"></div>
+              </div>
+              <div class="rounded-md border border-slate-200 bg-white p-4">
+                <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Confidence</div>
+                <div id="confidenceValue" class="mt-1 text-2xl font-bold text-black"></div>
+              </div>
+              <div class="rounded-md border border-slate-200 bg-white p-4">
+                <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Interpretation</div>
+                <div id="interpretationValue" class="mt-1 text-base font-semibold leading-6 text-slate-800"></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
-    <footer class="footer">
+    <section class="bg-white px-6 py-16">
+      <div class="mx-auto grid max-w-6xl items-center gap-10 md:grid-cols-2">
+        <div>
+          <h2 class="text-3xl font-bold text-black">What is KGW?</h2>
+          <p class="mt-4 max-w-xl text-lg leading-8 text-slate-600">
+            KGW is a measurable band of strong gum tissue surrounding your teeth
+            and a key indicator of long-term oral health.
+          </p>
+          <div class="mt-6">
+            <a href="about.html" class="inline-flex rounded-md border border-black px-4 py-2 font-semibold text-black transition hover:bg-black hover:text-white">Read More</a>
+          </div>
+        </div>
+
+        <div class="overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-sm">
+          <img class="h-full w-full object-cover" src="images/KG.png" alt="KGW dental illustration">
+        </div>
+      </div>
+    </section>
+
+    <footer class="bg-black px-6 py-5 text-center text-sm text-white">
       A collaborative project between the Faculty of Engineering and the Faculty of Dentistry, Chulalongkorn University
     </footer>
   </div>
 
+  <script src="export.js"></script>
   <script>
+    const RESULT_STORAGE_KEY = "gingigaugeResult";
+    const RESULT_DB_NAME = "gingigauge";
+    const RESULT_STORE_NAME = "results";
     const openUploadPopup = document.getElementById("openUploadPopup");
     const closeUploadPopup = document.getElementById("closeUploadPopup");
     const cancelUpload = document.getElementById("cancelUpload");
@@ -87,6 +117,113 @@
     const uploadModal = document.getElementById("uploadModal");
     const fileInput = document.getElementById("fileInput");
     const selectedFileName = document.getElementById("selectedFileName");
+    const selectedImagePreview = document.getElementById("selectedImagePreview");
+    const selectedImage = document.getElementById("selectedImage");
+    const clearResultBtn = document.getElementById("clearResultBtn");
+    let selectedImageUrl = "";
+
+    function openResultDb() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(RESULT_DB_NAME, 1);
+
+        request.onupgradeneeded = () => {
+          request.result.createObjectStore(RESULT_STORE_NAME);
+        };
+
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    async function saveStoredResult(result) {
+      const db = await openResultDb();
+
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(RESULT_STORE_NAME, "readwrite");
+        transaction.objectStore(RESULT_STORE_NAME).put(result, RESULT_STORAGE_KEY);
+        transaction.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        transaction.onerror = () => {
+          db.close();
+          reject(transaction.error);
+        };
+      });
+    }
+
+    async function loadStoredResult() {
+      const db = await openResultDb();
+
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(RESULT_STORE_NAME, "readonly");
+        const request = transaction.objectStore(RESULT_STORE_NAME).get(RESULT_STORAGE_KEY);
+
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+        transaction.oncomplete = () => db.close();
+        transaction.onerror = () => {
+          db.close();
+          reject(transaction.error);
+        };
+      });
+    }
+
+    async function deleteStoredResult() {
+      const db = await openResultDb();
+
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(RESULT_STORE_NAME, "readwrite");
+        transaction.objectStore(RESULT_STORE_NAME).delete(RESULT_STORAGE_KEY);
+        transaction.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+        transaction.onerror = () => {
+          db.close();
+          reject(transaction.error);
+        };
+      });
+    }
+
+    function showResult(imageSrc, resultData, shouldScroll = false) {
+      const exportContainer = document.getElementById("exportContainer");
+
+      initExport(imageSrc, resultData);
+      exportContainer.classList.remove("hidden");
+
+      if (shouldScroll) {
+        exportContainer.scrollIntoView({ behavior: "smooth" });
+      }
+    }
+
+    async function clearResult() {
+      const exportContainer = document.getElementById("exportContainer");
+
+      exportContainer.classList.add("hidden");
+      exportContainer.style.display = "";
+      document.getElementById("outputImage").src = "";
+      document.getElementById("kgwValue").textContent = "";
+      document.getElementById("confidenceValue").textContent = "";
+      document.getElementById("interpretationValue").textContent = "";
+      document.getElementById("downloadBtn").onclick = null;
+      document.getElementById("printBtn").onclick = null;
+      await deleteStoredResult();
+    }
+
+    async function restoreSavedResult() {
+      try {
+        const indexedDbResult = await loadStoredResult();
+
+        if (indexedDbResult) {
+          showResult(indexedDbResult.imageSrc, indexedDbResult.resultData);
+        }
+      } catch (error) {
+        console.warn("Could not restore saved result:", error);
+      }
+    }
+
+    restoreSavedResult();
 
     openUploadPopup.addEventListener("click", () => {
       uploadModal.style.display = "flex";
@@ -94,6 +231,15 @@
 
     function closeModal() {
       uploadModal.style.display = "none";
+      fileInput.value = "";
+      selectedFileName.textContent = "No file selected";
+      selectedImagePreview.classList.add("hidden");
+      selectedImage.src = "";
+
+      if (selectedImageUrl) {
+        URL.revokeObjectURL(selectedImageUrl);
+        selectedImageUrl = "";
+      }
     }
 
     closeUploadPopup.addEventListener("click", closeModal);
@@ -105,11 +251,34 @@
       }
     });
 
+    clearResultBtn.addEventListener("click", () => {
+      clearResult().catch((error) => {
+        console.warn("Could not clear saved result:", error);
+      });
+    });
+
     fileInput.addEventListener("change", () => {
       if (fileInput.files.length > 0) {
-        selectedFileName.textContent = "Selected: " + fileInput.files[0].name;
+        const selectedFile = fileInput.files[0];
+
+        selectedFileName.textContent = "Selected: " + selectedFile.name;
+
+        if (selectedImageUrl) {
+          URL.revokeObjectURL(selectedImageUrl);
+        }
+
+        selectedImageUrl = URL.createObjectURL(selectedFile);
+        selectedImage.src = selectedImageUrl;
+        selectedImagePreview.classList.remove("hidden");
       } else {
         selectedFileName.textContent = "No file selected";
+        selectedImagePreview.classList.add("hidden");
+        selectedImage.src = "";
+
+        if (selectedImageUrl) {
+          URL.revokeObjectURL(selectedImageUrl);
+          selectedImageUrl = "";
+        }
       }
     });
 
@@ -122,17 +291,58 @@
       const formData = new FormData();
       formData.append("file", fileInput.files[0]);
 
-      const response = await fetch("/predict", {
-        method: "POST",
-        body: formData
-      });
+      confirmUpload.disabled = true;
+      confirmUpload.textContent = "Measuring...";
 
-      const result = await response.json();
-      const imageUrl = "data:image/jpeg;base64," + result.data.image_base64;
-      initExport(imageUrl, result.data);
-      closeModal();
+      try {
+        const response = await fetch("/predict/rgb", {
+          method: "POST",
+          body: formData
+        });
+
+        const responseText = await response.text();
+        let result = {};
+
+        if (responseText) {
+          try {
+            result = JSON.parse(responseText);
+          } catch (error) {
+            throw new Error(responseText);
+          }
+        }
+
+        if (!response.ok || !result.success) {
+          alert(result.detail || "Prediction failed");
+          return;
+        }
+
+        const data = result.data;
+        const overlayUrl = "data:image/jpeg;base64," + data.image_base64;
+        const resultData = {
+          kgw_mm: "RGB only",
+          confidence: data.confidence,
+          interpretation: "Segmentation preview"
+        };
+
+        try {
+          await saveStoredResult({
+            imageSrc: overlayUrl,
+            resultData: resultData
+          });
+        } catch (error) {
+          console.warn("Could not save result:", error);
+        }
+
+        showResult(overlayUrl, resultData, true);
+
+        closeModal();
+      } catch (error) {
+        alert(error.message || "Prediction failed");
+      } finally {
+        confirmUpload.disabled = false;
+        confirmUpload.textContent = "Measure";
+      }
     });
   </script>
-  <script src="export.js"></script>
 </body>
 </html>

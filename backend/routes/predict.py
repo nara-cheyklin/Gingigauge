@@ -2,12 +2,11 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 import tempfile
 import os
 
-from backend.config.settings import ALLOWED_FILE_TYPES
+from backend.config.settings import ALLOWED_FILE_TYPES, ALLOWED_IMAGE_FILE_TYPES
 from backend.services.rosbag_processing import extract_rgb_and_depth_from_rosbag, cv2_to_bytes
-from backend.services.inference import run_inference
+from backend.services.inference import run_inference, run_inference_rgb_only
 
 router = APIRouter()
-
 
 def save_temp_file(file: UploadFile):
     suffix = os.path.splitext(file.filename)[-1]
@@ -18,7 +17,29 @@ def save_temp_file(file: UploadFile):
 
 
 @router.post("/predict")
-async def predict(file: UploadFile = File(...)):
+@router.post("/predict/rgb")
+async def predict_rgb_only(file: UploadFile = File(...)):
+    if file.content_type not in ALLOWED_IMAGE_FILE_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid image file type")
+
+    image_bytes = await file.read()
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="Uploaded image is empty")
+
+    try:
+        result = run_inference_rgb_only(image_bytes=image_bytes)
+
+        return {
+            "success": True,
+            "data": result
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/predict/rosbag")
+async def predict_rosbag(file: UploadFile = File(...)):
     if file.content_type not in ALLOWED_FILE_TYPES:
         raise HTTPException(status_code=400, detail="Invalid file type")
 

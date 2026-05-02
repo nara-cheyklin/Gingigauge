@@ -6,70 +6,74 @@
   <title>GINGIGAUGE - About Us</title>
   <link rel="stylesheet" href="style.css" />
 </head>
-<body>
-  <div class="page">
-    <header class="navbar">
-      <div class="logo">GINGIGAUGE</div>
-      <nav class="nav-menu">
-        <a href="index.html">Home</a>
-        <a href="contact.html">Contact</a>
+<body class="min-h-screen bg-slate-50 text-slate-900">
+  <div class="flex min-h-screen flex-col">
+    <header class="flex items-center justify-between bg-white px-6 py-4 shadow-sm md:px-12">
+      <div class="text-xl font-bold tracking-wide text-black">GINGIGAUGE</div>
+      <nav class="flex items-center gap-3">
+        <a href="index.html" class="rounded-md border border-black px-4 py-2 text-sm font-semibold text-black transition hover:bg-black hover:text-white">Home</a>
+        <a href="contact.html" class="rounded-md border border-black px-4 py-2 text-sm font-semibold text-black transition hover:bg-black hover:text-white">Contact</a>
       </nav>
     </header>
 
-    <!-- <div class="top-strip"></div> -->
-
-    <section class="section-one">
-      <div class="left-image">
-        <img src="images/KG-sideview.png" alt="Keratinized gingiva side view">
-      </div>
-
-      <div class="right-text">
-        <h1>Keratinized Gingiva</h1>
-        <p class="subtext">
-          The firm gum tissue around the teeth with a protective outer layer that
-          makes it more resistant to stress and inflammation than softer gum tissue
-        </p>
-
-        <h2>Keratinized Gingiva Width (KGW)</h2>
-        <p class="desc">
-          Serve as a key indicator of periodontal health and stability
-        </p>
-
-        <div class="kgw-list">
-          <div class="kgw-item">
-            <div class="kgw-title">Adequate KGW</div>
-            <div class="kgw-description">
-              • Reduce plaque buildup, and protects against gum recession and inflammation
-            </div>
+    <main class="flex-1">
+      <section class="bg-slate-50 px-6 py-16">
+        <div class="mx-auto grid max-w-6xl items-center gap-10 md:grid-cols-2">
+          <div class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            <img class="h-full w-full object-cover" src="images/KG-sideview.png" alt="Keratinized gingiva side view">
           </div>
 
-          <div class="kgw-item">
-            <div class="kgw-title">Inadequate KGW</div>
-            <div class="kgw-description">
-              • Increase the risk of recession, and potentially lead to periodontal disease
+          <div>
+            <h1 class="text-4xl font-extrabold tracking-wide text-black md:text-5xl">Keratinized Gingiva</h1>
+            <p class="mt-4 text-lg leading-8 text-slate-600">
+              The firm gum tissue around the teeth with a protective outer layer that
+              makes it more resistant to stress and inflammation than softer gum tissue.
+            </p>
+
+            <h2 class="mt-8 text-2xl font-bold text-black">Keratinized Gingiva Width (KGW)</h2>
+            <p class="mt-2 text-lg text-slate-600">
+              Serves as a key indicator of periodontal health and stability.
+            </p>
+
+            <div class="mt-8 grid gap-4">
+              <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                <div class="text-lg font-bold text-black">Adequate KGW</div>
+                <p class="mt-2 leading-7 text-slate-600">
+                  &bull; Reduces plaque buildup, and protects against gum recession and inflammation.
+                </p>
+              </div>
+
+              <div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                <div class="text-lg font-bold text-black">Inadequate KGW</div>
+                <p class="mt-2 leading-7 text-slate-600">
+                  &bull; Increases the risk of recession, and can potentially lead to periodontal disease.
+                </p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <section class="section-two">
-      <div class="left-content">
-        <h3>GINGIGAUGE</h3>
-        <p>
-          AI-powered digital solution designed to transform how Keratinized
-          Gingiva Width (KGW) is assessed in modern dentistry, enabling users
-          to upload standard intraoral photographs and receive fast, objective,
-          and clinically meaningful measurements.
-        </p>
-      </div>
+      <section class="bg-white px-6 py-16">
+        <div class="mx-auto grid max-w-6xl items-center gap-10 md:grid-cols-2">
+          <div>
+            <h3 class="text-4xl font-extrabold tracking-wide text-black md:text-5xl">GINGIGAUGE</h3>
+            <p class="mt-4 max-w-xl text-lg leading-8 text-slate-600">
+              AI-powered digital solution designed to transform how Keratinized
+              Gingiva Width (KGW) is assessed in modern dentistry, enabling users
+              to upload standard intraoral photographs and receive fast, objective,
+              and clinically meaningful measurements.
+            </p>
+          </div>
 
-      <div class="right-image">
-        <img src="images/diagnosis.png" alt="Dental AI technology display">
-      </div>
-    </section>
+          <div class="overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-sm">
+            <img class="h-full w-full object-cover" src="images/diagnosis.png" alt="Dental AI technology display">
+          </div>
+        </div>
+      </section>
+    </main>
 
-    <footer class="footer">
+    <footer class="bg-black px-6 py-5 text-center text-sm text-white">
       A collaborative project between the Faculty of Engineering and the Faculty of Dentistry, Chulalongkorn University
     </footer>
   </div>

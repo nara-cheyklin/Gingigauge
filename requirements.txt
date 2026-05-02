@@ -2,8 +2,12 @@
 fastapi
 uvicorn[standard]
 python-multipart
+email-validator
 torch
 numpy
 opencv-python-headless
 Pillow
 rosbags
+google-cloud-aiplatform
+google-cloud-firestore
+python-dotenv
