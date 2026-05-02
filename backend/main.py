@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from backend.routes.predict import router
+from backend.routes.predict import router as predict_router
+from backend.routes.contact import router as contact_router
 
 app = FastAPI(title="Gingigage API")
 
@@ -12,6 +13,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(router)
+app.include_router(predict_router)
+app.include_router(contact_router)
 
 app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")

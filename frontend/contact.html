@@ -26,13 +26,16 @@
           <div class="mx-auto min-h-[520px] w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
             <h1 class="text-4xl font-extrabold tracking-wide text-black md:text-5xl">Contact Us</h1>
 
-            <form class="mt-8 grid gap-4">
-              <input class="w-full rounded-md border border-slate-300 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-black focus:ring-2 focus:ring-black/10" type="text" placeholder="First Name" />
-              <input class="w-full rounded-md border border-slate-300 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-black focus:ring-2 focus:ring-black/10" type="text" placeholder="Last Name" />
-              <input class="w-full rounded-md border border-slate-300 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-black focus:ring-2 focus:ring-black/10" type="email" placeholder="Email" />
-              <input class="w-full rounded-md border border-slate-300 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-black focus:ring-2 focus:ring-black/10" type="text" placeholder="Subject" />
-              <textarea class="min-h-32 w-full resize-none rounded-md border border-slate-300 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-black focus:ring-2 focus:ring-black/10" placeholder="Message"></textarea>
-              <button type="submit" class="mt-2 w-fit rounded-md bg-black px-6 py-3 font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2">Submit</button>
+            <form id="contactForm" class="mt-8 grid gap-4">
+              <input id="firstName" class="w-full rounded-md border border-slate-300 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-black focus:ring-2 focus:ring-black/10" type="text" placeholder="First Name" required />
+              <input id="lastName" class="w-full rounded-md border border-slate-300 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-black focus:ring-2 focus:ring-black/10" type="text" placeholder="Last Name" required />
+              <input id="email" class="w-full rounded-md border border-slate-300 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-black focus:ring-2 focus:ring-black/10" type="email" placeholder="Email" required />
+              <input id="subject" class="w-full rounded-md border border-slate-300 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-black focus:ring-2 focus:ring-black/10" type="text" placeholder="Subject" required />
+              <textarea id="message" class="min-h-32 w-full resize-none rounded-md border border-slate-300 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-black focus:ring-2 focus:ring-black/10" placeholder="Message" required></textarea>
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <button id="submitContact" type="submit" class="mt-2 w-fit rounded-md bg-black px-6 py-3 font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2">Submit</button>
+                <p id="contactStatus" class="text-sm font-semibold text-slate-600"></p>
+              </div>
             </form>
           </div>
         <!-- </div> -->
@@ -65,5 +68,54 @@
       A collaborative project between the Faculty of Engineering and the Faculty of Dentistry, Chulalongkorn University
     </footer>
   </div>
+  <script>
+    const contactForm = document.getElementById("contactForm");
+    const submitContact = document.getElementById("submitContact");
+    const contactStatus = document.getElementById("contactStatus");
+
+    contactForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      submitContact.disabled = true;
+      submitContact.textContent = "Sending...";
+      contactStatus.textContent = "";
+
+      try {
+        const response = await fetch("/contact", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            first_name: document.getElementById("firstName").value.trim(),
+            last_name: document.getElementById("lastName").value.trim(),
+            email: document.getElementById("email").value.trim(),
+            subject: document.getElementById("subject").value.trim(),
+            message: document.getElementById("message").value.trim(),
+          }),
+        });
+
+        const responseText = await response.text();
+        const result = responseText ? JSON.parse(responseText) : {};
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.detail || "Message could not be sent");
+        }
+
+        contactForm.reset();
+        contactStatus.textContent = "Submitted succesfully";
+        contactStatus.className = "text-sm font-semibold text-emerald-700";
+        setTimeout(() => {
+          contactStatus.textContent = "";
+        }, 4000);
+      } catch (error) {
+        contactStatus.textContent = error.message || "Message could not be sent";
+        contactStatus.className = "text-sm font-semibold text-red-700";
+      } finally {
+        submitContact.disabled = false;
+        submitContact.textContent = "Submit";
+      }
+    });
+  </script>
 </body>
 </html>
