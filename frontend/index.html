@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GINGIGAUGE</title>
   <link rel="stylesheet" href="style.css" />
+  <script src="config.js"></script>
 </head>
 <body class="min-h-screen bg-slate-50 text-slate-900">
   <div class="flex min-h-screen flex-col">
@@ -304,7 +305,7 @@
       confirmUpload.textContent = "Measuring...";
 
       try {
-        const response = await fetch("/predict/rosbag", {
+        const response = await fetch(`${window.API_BASE_URL}/predict/rosbag`, {
           method: "POST",
           body: formData
         });
@@ -380,7 +381,7 @@
       cloudUploadStatus.textContent = "Uploading to GCP...";
 
       try {
-        const response = await fetch("/upload", {
+        const response = await fetch(`${window.API_BASE_URL}/upload`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

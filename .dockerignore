@@ -1,0 +1,37 @@
+# Frontend ships separately to Firebase Hosting.
+frontend/
+
+# Local dev / version control / OS cruft
+.git/
+.gitignore
+.dockerignore
+.DS_Store
+.env
+.env.*
+*.md
+*.log
+
+# Node tooling (only used to build Tailwind for the frontend)
+node_modules/
+package.json
+package-lock.json
+
+# Python build artefacts and virtual envs
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+.pytest_cache/
+
+# Sample inputs and ad-hoc scripts not meant for production
+sample_image/
+test.py
+
+# Firebase Hosting config (irrelevant to the backend image)
+firebase.json
+.firebaserc
+.firebase/
+
+# Don't ship deploy docs
+DEPLOY.md
