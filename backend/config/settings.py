@@ -9,17 +9,12 @@ GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID")
 GCP_REGION = os.getenv("GCP_REGION")
 GCP_ENDPOINT_ID = os.getenv("GCP_ENDPOINT_ID")
 GCP_ENDPOINT_IMAGE_MAX_SIZE = int(os.getenv("GCP_ENDPOINT_IMAGE_MAX_SIZE", "0"))
-
+GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME")
+ROBOFLOW_API_KEY = os.getenv("ROBOFLOW_API_KEY")
 ALLOWED_FILE_TYPES = [
     "application/octet-stream",
     "application/x-bag"
 ]
-
-ALLOWED_IMAGE_FILE_TYPES = {
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-}
 
 KGW_THRESHOLD_MM = 2.0
 
@@ -36,4 +31,3 @@ CAMERA_INTRINSICS = {
 # If depth image is uint16 in millimeters, use 1.0
 # If depth is in meters, use 1000.0 when converting to mm
 DEPTH_UNIT_SCALE = 1.0
-ROBOFLOW_API_KEY = "AJsHVIAWkG50GbTG9Uv4"
