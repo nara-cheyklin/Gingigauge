@@ -4,6 +4,5 @@
 //   - Local development (FastAPI also serves the frontend): leave as ""
 //     so fetches stay same-origin.
 //   - Production (Firebase Hosting + Cloud Run): set to the Cloud Run
-//     service URL after `gcloud run deploy` prints it, e.g.
-//     "https://gingigauge-api-XXXXXXXXXX-uc.a.run.app".
-window.API_BASE_URL = "";
+//     service URL printed by `gcloud run deploy`.
+window.API_BASE_URL = "https://gingigauge-api-18414341986.us-central1.run.app";

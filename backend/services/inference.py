@@ -7,8 +7,8 @@ from google.cloud import aiplatform
 from backend.config.settings import (
     GCP_ENDPOINT_ID,
     GCP_ENDPOINT_IMAGE_MAX_SIZE,
-    GCP_PROJECT_ID,
-    GCP_REGION,
+    VERTEX_PROJECT_ID,
+    VERTEX_REGION,
 )
 
 _endpoint = None
@@ -18,10 +18,10 @@ def get_endpoint():
     global _endpoint
 
     if _endpoint is None:
-        aiplatform.init(project=GCP_PROJECT_ID, location=GCP_REGION)
+        aiplatform.init(project=VERTEX_PROJECT_ID, location=VERTEX_REGION)
         _endpoint = aiplatform.Endpoint(
             endpoint_name=(
-                f"projects/{GCP_PROJECT_ID}/locations/{GCP_REGION}/"
+                f"projects/{VERTEX_PROJECT_ID}/locations/{VERTEX_REGION}/"
                 f"endpoints/{GCP_ENDPOINT_ID}"
             )
         )

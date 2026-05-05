@@ -5,8 +5,15 @@ load_dotenv()
 
 # settings.py
 
+# Application project: hosts Cloud Run, Firestore, Secret Manager.
 GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID")
 GCP_REGION = os.getenv("GCP_REGION")
+
+# Vertex AI project: where the deployed model/endpoint lives. Falls back to
+# GCP_PROJECT_ID if not set, so single-project local dev still works.
+VERTEX_PROJECT_ID = os.getenv("VERTEX_PROJECT_ID", GCP_PROJECT_ID)
+VERTEX_REGION = os.getenv("VERTEX_REGION", GCP_REGION)
+
 GCP_ENDPOINT_ID = os.getenv("GCP_ENDPOINT_ID")
 GCP_ENDPOINT_IMAGE_MAX_SIZE = int(os.getenv("GCP_ENDPOINT_IMAGE_MAX_SIZE", "0"))
 GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME")
