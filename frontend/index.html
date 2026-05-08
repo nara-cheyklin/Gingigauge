@@ -40,6 +40,24 @@
       </div>
     </div>
 
+    <!-- ROI Crop Modal -->
+    <div class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4" id="cropModal">
+      <div class="relative w-full max-w-3xl rounded-lg bg-white p-6 shadow-xl">
+        <button class="absolute right-4 top-3 text-3xl leading-none text-slate-400 transition hover:text-slate-700" id="closeCropModal">&times;</button>
+        <h2 class="text-2xl font-bold text-slate-900">Select Region of Interest</h2>
+        <p class="mt-1 text-sm text-slate-600">Click and drag on the image to crop to the gingiva region. Skip to measure the full frame.</p>
+        <div class="mt-4 overflow-hidden rounded-md border border-slate-200 bg-slate-100" style="cursor: crosshair;">
+          <canvas id="cropCanvas" class="block w-full touch-none"></canvas>
+        </div>
+        <div id="cropStatus" class="mt-2 text-sm text-slate-500">No region selected — full image will be used.</div>
+        <div class="mt-4 flex justify-end gap-3">
+          <button class="rounded-md border border-slate-300 px-4 py-2 font-semibold text-slate-700 transition hover:bg-slate-100" id="cancelCropBtn">Cancel</button>
+          <button class="rounded-md border border-black px-4 py-2 font-semibold text-black transition hover:bg-black hover:text-white" id="skipCropBtn">Full Image</button>
+          <button class="rounded-md bg-black px-4 py-2 font-semibold text-white transition hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed" id="confirmCropBtn" disabled>Measure Selection</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Cloud Upload Popup -->
     <div class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 px-4" id="cloudUploadModal">
       <div class="relative w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
@@ -122,106 +140,96 @@
 
   <script src="export.js"></script>
   <script>
-    const RESULT_STORAGE_KEY = "gingigaugeResult";
-    const RESULT_DB_NAME = "gingigauge";
-    const RESULT_STORE_NAME = "results";
-    const openUploadPopup = document.getElementById("openUploadPopup");
-    const closeUploadPopup = document.getElementById("closeUploadPopup");
-    const cancelUpload = document.getElementById("cancelUpload");
-    const confirmUpload = document.getElementById("confirmUpload");
-    const uploadModal = document.getElementById("uploadModal");
-    const fileInput = document.getElementById("fileInput");
-    const selectedFileName = document.getElementById("selectedFileName");
-    const clearResultBtn = document.getElementById("clearResultBtn");
-    const uploadToCloudBtn = document.getElementById("uploadToCloudBtn");
-    const cloudUploadModal = document.getElementById("cloudUploadModal");
-    const closeCloudUploadModal = document.getElementById("closeCloudUploadModal");
-    const cancelCloudUpload = document.getElementById("cancelCloudUpload");
-    const confirmCloudUpload = document.getElementById("confirmCloudUpload");
-    const patientIdInput = document.getElementById("patientIdInput");
-    const cloudUploadStatus = document.getElementById("cloudUploadStatus");
-    let currentDataUrl = "";
+    // ── element refs ──────────────────────────────────────────────────────────
+    const RESULT_STORAGE_KEY   = "gingigaugeResult";
+    const RESULT_DB_NAME       = "gingigauge";
+    const RESULT_STORE_NAME    = "results";
+    const openUploadPopup      = document.getElementById("openUploadPopup");
+    const closeUploadPopup     = document.getElementById("closeUploadPopup");
+    const cancelUpload         = document.getElementById("cancelUpload");
+    const confirmUpload        = document.getElementById("confirmUpload");
+    const uploadModal          = document.getElementById("uploadModal");
+    const fileInput            = document.getElementById("fileInput");
+    const selectedFileName     = document.getElementById("selectedFileName");
+    const clearResultBtn       = document.getElementById("clearResultBtn");
+    const uploadToCloudBtn     = document.getElementById("uploadToCloudBtn");
+    const cloudUploadModal     = document.getElementById("cloudUploadModal");
+    const closeCloudUploadModal= document.getElementById("closeCloudUploadModal");
+    const cancelCloudUpload    = document.getElementById("cancelCloudUpload");
+    const confirmCloudUpload   = document.getElementById("confirmCloudUpload");
+    const patientIdInput       = document.getElementById("patientIdInput");
+    const cloudUploadStatus    = document.getElementById("cloudUploadStatus");
+    // crop modal
+    const cropModal      = document.getElementById("cropModal");
+    const cropCanvas     = document.getElementById("cropCanvas");
+    const cropCtx        = cropCanvas.getContext("2d");
+    const cropStatusEl   = document.getElementById("cropStatus");
+    const confirmCropBtn = document.getElementById("confirmCropBtn");
+    const skipCropBtn    = document.getElementById("skipCropBtn");
+    const cancelCropBtn  = document.getElementById("cancelCropBtn");
 
+    // ── state ─────────────────────────────────────────────────────────────────
+    let currentDataUrl   = "";
+    let currentGcsPath   = "";   // held between preview and predict steps
+    let cropRect         = null; // {x,y,w,h} in actual image pixels, or null
+    let cropIsDragging   = false;
+    let cropStartX = 0, cropStartY = 0, cropEndX = 0, cropEndY = 0;
+    const cropImage      = new Image();
+
+    // ── IndexedDB helpers ─────────────────────────────────────────────────────
     function openResultDb() {
       return new Promise((resolve, reject) => {
         const request = indexedDB.open(RESULT_DB_NAME, 1);
-
-        request.onupgradeneeded = () => {
-          request.result.createObjectStore(RESULT_STORE_NAME);
-        };
-
+        request.onupgradeneeded = () => { request.result.createObjectStore(RESULT_STORE_NAME); };
         request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
+        request.onerror  = () => reject(request.error);
       });
     }
 
     async function saveStoredResult(result) {
       const db = await openResultDb();
-
       return new Promise((resolve, reject) => {
-        const transaction = db.transaction(RESULT_STORE_NAME, "readwrite");
-        transaction.objectStore(RESULT_STORE_NAME).put(result, RESULT_STORAGE_KEY);
-        transaction.oncomplete = () => {
-          db.close();
-          resolve();
-        };
-        transaction.onerror = () => {
-          db.close();
-          reject(transaction.error);
-        };
+        const tx = db.transaction(RESULT_STORE_NAME, "readwrite");
+        tx.objectStore(RESULT_STORE_NAME).put(result, RESULT_STORAGE_KEY);
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror    = () => { db.close(); reject(tx.error); };
       });
     }
 
     async function loadStoredResult() {
       const db = await openResultDb();
-
       return new Promise((resolve, reject) => {
-        const transaction = db.transaction(RESULT_STORE_NAME, "readonly");
-        const request = transaction.objectStore(RESULT_STORE_NAME).get(RESULT_STORAGE_KEY);
-
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-        transaction.oncomplete = () => db.close();
-        transaction.onerror = () => {
-          db.close();
-          reject(transaction.error);
-        };
+        const tx = db.transaction(RESULT_STORE_NAME, "readonly");
+        const req = tx.objectStore(RESULT_STORE_NAME).get(RESULT_STORAGE_KEY);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror   = () => reject(req.error);
+        tx.oncomplete = () => db.close();
+        tx.onerror    = () => { db.close(); reject(tx.error); };
       });
     }
 
     async function deleteStoredResult() {
       const db = await openResultDb();
-
       return new Promise((resolve, reject) => {
-        const transaction = db.transaction(RESULT_STORE_NAME, "readwrite");
-        transaction.objectStore(RESULT_STORE_NAME).delete(RESULT_STORAGE_KEY);
-        transaction.oncomplete = () => {
-          db.close();
-          resolve();
-        };
-        transaction.onerror = () => {
-          db.close();
-          reject(transaction.error);
-        };
+        const tx = db.transaction(RESULT_STORE_NAME, "readwrite");
+        tx.objectStore(RESULT_STORE_NAME).delete(RESULT_STORAGE_KEY);
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror    = () => { db.close(); reject(tx.error); };
       });
     }
 
+    // ── result display ────────────────────────────────────────────────────────
     function showResult(imageSrc, resultData, shouldScroll = false) {
       currentDataUrl = imageSrc;
       const exportContainer = document.getElementById("exportContainer");
-
       initExport(imageSrc, resultData);
       exportContainer.classList.remove("hidden");
-
-      if (shouldScroll) {
-        exportContainer.scrollIntoView({ behavior: "smooth" });
-      }
+      if (shouldScroll) exportContainer.scrollIntoView({ behavior: "smooth" });
     }
 
     async function clearResult() {
       currentDataUrl = "";
       const exportContainer = document.getElementById("exportContainer");
-
       exportContainer.classList.add("hidden");
       exportContainer.style.display = "";
       document.getElementById("outputImage").src = "";
@@ -235,21 +243,15 @@
 
     async function restoreSavedResult() {
       try {
-        const indexedDbResult = await loadStoredResult();
-
-        if (indexedDbResult) {
-          showResult(indexedDbResult.imageSrc, indexedDbResult.resultData);
-        }
-      } catch (error) {
-        console.warn("Could not restore saved result:", error);
-      }
+        const saved = await loadStoredResult();
+        if (saved) showResult(saved.imageSrc, saved.resultData);
+      } catch (e) { console.warn("Could not restore saved result:", e); }
     }
 
     restoreSavedResult();
 
-    openUploadPopup.addEventListener("click", () => {
-      uploadModal.style.display = "flex";
-    });
+    // ── upload modal ──────────────────────────────────────────────────────────
+    openUploadPopup.addEventListener("click", () => { uploadModal.style.display = "flex"; });
 
     function closeModal() {
       uploadModal.style.display = "none";
@@ -259,25 +261,14 @@
 
     closeUploadPopup.addEventListener("click", closeModal);
     cancelUpload.addEventListener("click", closeModal);
-
-    uploadModal.addEventListener("click", (e) => {
-      if (e.target === uploadModal) {
-        closeModal();
-      }
-    });
-
-    clearResultBtn.addEventListener("click", () => {
-      clearResult().catch((error) => {
-        console.warn("Could not clear saved result:", error);
-      });
-    });
-
+    uploadModal.addEventListener("click", (e) => { if (e.target === uploadModal) closeModal(); });
+    clearResultBtn.addEventListener("click", () => { clearResult().catch(console.warn); });
     fileInput.addEventListener("change", () => {
       selectedFileName.textContent = fileInput.files.length > 0
-        ? "Selected: " + fileInput.files[0].name
-        : "No file selected";
+        ? "Selected: " + fileInput.files[0].name : "No file selected";
     });
 
+    // ── utilities ─────────────────────────────────────────────────────────────
     function blobToDataUrl(blob) {
       return new Promise((resolve) => {
         const reader = new FileReader();
@@ -286,63 +277,262 @@
       });
     }
 
-    confirmUpload.addEventListener("click", async () => {
-      if (fileInput.files.length === 0) {
-        alert("Please select a file first.");
-        return;
+    function putToSignedUrl(url, file, contentType, onProgress) {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", url, true);
+        xhr.setRequestHeader("Content-Type", contentType);
+        xhr.upload.onprogress = (evt) => {
+          if (evt.lengthComputable && typeof onProgress === "function")
+            onProgress(evt.loaded / evt.total);
+        };
+        xhr.onload  = () => xhr.status >= 200 && xhr.status < 300
+          ? resolve()
+          : reject(new Error("Upload failed (" + xhr.status + "): " + (xhr.responseText || xhr.statusText)));
+        xhr.onerror = () => reject(new Error("Network error during upload"));
+        xhr.onabort = () => reject(new Error("Upload aborted"));
+        xhr.send(file);
+      });
+    }
+
+    // ── crop canvas ───────────────────────────────────────────────────────────
+    function cropCanvasCoords(e) {
+      const rect   = cropCanvas.getBoundingClientRect();
+      const scaleX = cropCanvas.width  / rect.width;
+      const scaleY = cropCanvas.height / rect.height;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return {
+        x: Math.max(0, Math.min((clientX - rect.left) * scaleX, cropCanvas.width)),
+        y: Math.max(0, Math.min((clientY - rect.top)  * scaleY, cropCanvas.height)),
+      };
+    }
+
+    function drawCropFrame() {
+      cropCtx.clearRect(0, 0, cropCanvas.width, cropCanvas.height);
+      cropCtx.drawImage(cropImage, 0, 0);
+
+      let rx, ry, rw, rh;
+      if (cropIsDragging) {
+        rx = Math.min(cropStartX, cropEndX); ry = Math.min(cropStartY, cropEndY);
+        rw = Math.abs(cropEndX - cropStartX); rh = Math.abs(cropEndY - cropStartY);
+      } else if (cropRect) {
+        ({ x: rx, y: ry, w: rw, h: rh } = cropRect);
+      } else { return; }
+
+      cropCtx.fillStyle = "rgba(0,0,0,0.45)";
+      cropCtx.fillRect(0, 0, cropCanvas.width, cropCanvas.height);
+      if (rw > 0 && rh > 0) cropCtx.drawImage(cropImage, rx, ry, rw, rh, rx, ry, rw, rh);
+      cropCtx.strokeStyle = "#38bdf8";
+      cropCtx.lineWidth   = Math.max(2, cropCanvas.width / 300);
+      cropCtx.strokeRect(rx, ry, rw, rh);
+      const hs = Math.max(6, cropCanvas.width / 150);
+      cropCtx.fillStyle = "#38bdf8";
+      [[rx, ry],[rx+rw, ry],[rx, ry+rh],[rx+rw, ry+rh]].forEach(([hx,hy]) => {
+        cropCtx.fillRect(hx - hs/2, hy - hs/2, hs, hs);
+      });
+    }
+
+    function finaliseSelection() {
+      const x = Math.round(Math.min(cropStartX, cropEndX));
+      const y = Math.round(Math.min(cropStartY, cropEndY));
+      const w = Math.round(Math.abs(cropEndX - cropStartX));
+      const h = Math.round(Math.abs(cropEndY - cropStartY));
+      if (w < 10 || h < 10) {
+        cropRect = null;
+        confirmCropBtn.disabled = true;
+        cropStatusEl.textContent = "Selection too small — try again or use Full Image.";
+      } else {
+        cropRect = { x, y, w, h };
+        confirmCropBtn.disabled = false;
+        cropStatusEl.textContent = "Selected region: " + w + " \xd7 " + h + " px  (origin " + x + ", " + y + ").";
       }
+      drawCropFrame();
+    }
 
-      const file = fileInput.files[0];
-      if (!file.name.toLowerCase().endsWith(".bag")) {
-        alert("Only .bag files are accepted.");
-        return;
-      }
+    cropCanvas.addEventListener("mousedown", (e) => {
+      const pos = cropCanvasCoords(e);
+      cropIsDragging = true;
+      cropStartX = cropEndX = pos.x; cropStartY = cropEndY = pos.y;
+      cropRect = null; confirmCropBtn.disabled = true;
+      cropStatusEl.textContent = "Drawing selection…";
+    });
+    cropCanvas.addEventListener("mousemove", (e) => {
+      if (!cropIsDragging) return;
+      const pos = cropCanvasCoords(e); cropEndX = pos.x; cropEndY = pos.y; drawCropFrame();
+    });
+    cropCanvas.addEventListener("mouseup", (e) => {
+      if (!cropIsDragging) return; cropIsDragging = false;
+      const pos = cropCanvasCoords(e); cropEndX = pos.x; cropEndY = pos.y; finaliseSelection();
+    });
+    cropCanvas.addEventListener("mouseleave", () => {
+      if (cropIsDragging) { cropIsDragging = false; finaliseSelection(); }
+    });
+    cropCanvas.addEventListener("touchstart",  (e) => { e.preventDefault(); const t = e.touches[0]; cropCanvas.dispatchEvent(new MouseEvent("mousedown",  { clientX: t.clientX, clientY: t.clientY })); }, { passive: false });
+    cropCanvas.addEventListener("touchmove",   (e) => { e.preventDefault(); const t = e.touches[0]; cropCanvas.dispatchEvent(new MouseEvent("mousemove",  { clientX: t.clientX, clientY: t.clientY })); }, { passive: false });
+    cropCanvas.addEventListener("touchend",    (e) => { e.preventDefault(); const t = e.changedTouches[0]; cropCanvas.dispatchEvent(new MouseEvent("mouseup", { clientX: t.clientX, clientY: t.clientY })); }, { passive: false });
 
-      const formData = new FormData();
-      formData.append("file", file);
+    function openCropModal(imageUrl, gcsPath) {
+      currentGcsPath = gcsPath;
+      cropRect = null; cropIsDragging = false;
+      confirmCropBtn.disabled = true; skipCropBtn.disabled = false; cancelCropBtn.disabled = false;
+      cropStatusEl.textContent = "No region selected — full image will be used.";
+      cropImage.onload = () => {
+        cropCanvas.width  = cropImage.naturalWidth;
+        cropCanvas.height = cropImage.naturalHeight;
+        cropCtx.drawImage(cropImage, 0, 0);
+      };
+      cropImage.src = imageUrl;
+      cropModal.style.display = "flex";
+    }
 
-      confirmUpload.disabled = true;
-      confirmUpload.textContent = "Measuring...";
+    function closeCropModal() {
+      cropModal.style.display = "none";
+      currentGcsPath = ""; cropRect = null;
+    }
+
+    document.getElementById("closeCropModal").addEventListener("click", closeCropModal);
+    cancelCropBtn.addEventListener("click", closeCropModal);
+    cropModal.addEventListener("click", (e) => { if (e.target === cropModal) closeCropModal(); });
+
+    // ── shared predict + show ─────────────────────────────────────────────────
+    async function runAndShowPrediction(gcsPath, roi, activeBtn) {
+      const otherBtn = activeBtn === confirmCropBtn ? skipCropBtn : confirmCropBtn;
+      activeBtn.disabled = true; activeBtn.textContent = "Measuring…";
+      otherBtn.disabled = true; cancelCropBtn.disabled = true;
 
       try {
-        const response = await fetch(`${window.API_BASE_URL}/predict/rosbag`, {
+        const body = { gcs_path: gcsPath };
+        if (roi) body.roi = [roi.x, roi.y, roi.w, roi.h];
+
+        const response = await fetch(window.API_BASE_URL + "/predict/rosbag", {
           method: "POST",
-          body: formData
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
         });
 
         if (!response.ok) {
           const text = await response.text();
           let detail = "Prediction failed";
           try { detail = JSON.parse(text).detail; } catch {}
-          alert(detail);
+          alert(detail); return;
+        }
+
+        const blob    = await response.blob();
+        const dataUrl = await blobToDataUrl(blob);
+        const kgwRaw  = response.headers.get("X-KGW-MM");
+        const confRaw = response.headers.get("X-Confidence");
+        const resultData = {
+          kgw_mm:         kgwRaw  === "null" ? null : parseFloat(kgwRaw),
+          confidence:     confRaw === "null" ? null : parseFloat(confRaw),
+          interpretation: response.headers.get("X-Interpretation"),
+        };
+
+        try { await saveStoredResult({ imageSrc: dataUrl, resultData }); } catch {}
+        showResult(dataUrl, resultData, true);
+        closeCropModal();
+      } catch (err) {
+        alert(err.message || "Prediction failed");
+      } finally {
+        activeBtn.disabled  = roi ? (cropRect === null) : false;
+        activeBtn.textContent = roi ? "Measure Selection" : "Full Image";
+        otherBtn.disabled   = false;
+        cancelCropBtn.disabled = false;
+      }
+    }
+
+    confirmCropBtn.addEventListener("click", () => {
+      if (!cropRect || !currentGcsPath) return;
+      runAndShowPrediction(currentGcsPath, cropRect, confirmCropBtn);
+    });
+    skipCropBtn.addEventListener("click", () => {
+      if (!currentGcsPath) return;
+      runAndShowPrediction(currentGcsPath, null, skipCropBtn);
+    });
+
+    // ── upload flow: GCS PUT -> preview -> crop modal -> predict ──────────────
+    confirmUpload.addEventListener("click", async () => {
+      if (fileInput.files.length === 0) { alert("Please select a file first."); return; }
+      const file = fileInput.files[0];
+      if (!file.name.toLowerCase().endsWith(".bag")) { alert("Only .bag files are accepted."); return; }
+
+      const contentType = file.type || "application/octet-stream";
+      confirmUpload.disabled = true;
+      confirmUpload.textContent = "Preparing upload...";
+
+      try {
+        // Step 1: signed PUT URL
+        const urlResp = await fetch(window.API_BASE_URL + "/predict/rosbag/upload-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename: file.name, content_type: contentType }),
+        });
+        if (!urlResp.ok) {
+          const text = await urlResp.text();
+          let detail = "Could not get upload URL";
+          try { detail = JSON.parse(text).detail; } catch {}
+          alert(detail); return;
+        }
+        const { upload_url, gcs_path } = await urlResp.json();
+
+        // Step 2: PUT .bag to GCS
+        await putToSignedUrl(upload_url, file, contentType, (pct) => {
+          confirmUpload.textContent = "Uploading " + Math.round(pct * 100) + "%";
+        });
+
+        // Step 3: fetch preview frame for crop UI
+        confirmUpload.textContent = "Loading preview...";
+        const previewResp = await fetch(window.API_BASE_URL + "/predict/rosbag/preview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ gcs_path }),
+        });
+
+        if (!previewResp.ok) {
+          // Preview failed — fall back to full-frame prediction without crop UI
+          console.warn("Preview failed, running full prediction.");
+          confirmUpload.textContent = "Measuring...";
+          const response = await fetch(window.API_BASE_URL + "/predict/rosbag", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ gcs_path }),
+          });
+          if (!response.ok) {
+            const text = await response.text();
+            let detail = "Prediction failed";
+            try { detail = JSON.parse(text).detail; } catch {}
+            alert(detail); return;
+          }
+          const blob = await response.blob();
+          const dataUrl = await blobToDataUrl(blob);
+          const kgwRaw = response.headers.get("X-KGW-MM");
+          const confRaw = response.headers.get("X-Confidence");
+          const resultData = {
+            kgw_mm:         kgwRaw  === "null" ? null : parseFloat(kgwRaw),
+            confidence:     confRaw === "null" ? null : parseFloat(confRaw),
+            interpretation: response.headers.get("X-Interpretation"),
+          };
+          try { await saveStoredResult({ imageSrc: dataUrl, resultData }); } catch {}
+          showResult(dataUrl, resultData, true);
+          closeModal();
           return;
         }
 
-        const blob = await response.blob();
-        const dataUrl = await blobToDataUrl(blob);
-
-        const kgwRaw = response.headers.get("X-KGW-MM");
-        const resultData = {
-          kgw_mm: kgwRaw === "null" ? null : parseFloat(kgwRaw),
-          confidence: parseFloat(response.headers.get("X-Confidence")),
-          interpretation: response.headers.get("X-Interpretation")
-        };
-
-        try {
-          await saveStoredResult({ imageSrc: dataUrl, resultData });
-        } catch (error) {
-          console.warn("Could not save result:", error);
-        }
-
-        showResult(dataUrl, resultData, true);
+        // Step 4: show crop modal with preview frame
+        const previewBlob = await previewResp.blob();
+        const previewUrl  = URL.createObjectURL(previewBlob);
         closeModal();
-      } catch (error) {
-        alert(error.message || "Prediction failed");
+        openCropModal(previewUrl, gcs_path);
+
+      } catch (err) {
+        alert(err.message || "Upload failed");
       } finally {
-        confirmUpload.disabled = false;
+        confirmUpload.disabled  = false;
         confirmUpload.textContent = "Measure";
       }
     });
+
+    // ── cloud upload modal ────────────────────────────────────────────────────
     function openCloudUploadModal() {
       patientIdInput.value = "";
       cloudUploadStatus.className = "mt-3 hidden rounded-md px-3 py-2 text-sm";
@@ -352,28 +542,16 @@
       cloudUploadModal.style.display = "flex";
     }
 
-    function closeCloudModal() {
-      cloudUploadModal.style.display = "none";
-    }
+    function closeCloudModal() { cloudUploadModal.style.display = "none"; }
 
-    uploadToCloudBtn.addEventListener("click", () => {
-      if (!currentDataUrl) return;
-      openCloudUploadModal();
-    });
-
+    uploadToCloudBtn.addEventListener("click", () => { if (!currentDataUrl) return; openCloudUploadModal(); });
     closeCloudUploadModal.addEventListener("click", closeCloudModal);
     cancelCloudUpload.addEventListener("click", closeCloudModal);
-
-    cloudUploadModal.addEventListener("click", (e) => {
-      if (e.target === cloudUploadModal) closeCloudModal();
-    });
+    cloudUploadModal.addEventListener("click", (e) => { if (e.target === cloudUploadModal) closeCloudModal(); });
 
     confirmCloudUpload.addEventListener("click", async () => {
       const patientId = patientIdInput.value.trim();
-      if (!patientId) {
-        patientIdInput.focus();
-        return;
-      }
+      if (!patientId) { patientIdInput.focus(); return; }
 
       confirmCloudUpload.disabled = true;
       confirmCloudUpload.textContent = "Uploading...";
@@ -381,28 +559,20 @@
       cloudUploadStatus.textContent = "Uploading to GCP...";
 
       try {
-        const response = await fetch(`${window.API_BASE_URL}/upload`, {
+        const response = await fetch(window.API_BASE_URL + "/upload", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            patient_id: patientId,
-            image_data_url: currentDataUrl
-          })
+          body: JSON.stringify({ patient_id: patientId, image_data_url: currentDataUrl }),
         });
-
         const result = await response.json();
-
-        if (!response.ok || !result.success) {
-          throw new Error(result.detail || "Upload failed");
-        }
+        if (!response.ok || !result.success) throw new Error(result.detail || "Upload failed");
 
         cloudUploadStatus.className = "mt-3 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700";
         cloudUploadStatus.textContent = "Uploaded successfully. Record ID: " + result.data.record_id;
-
         setTimeout(closeCloudModal, 2000);
-      } catch (error) {
+      } catch (err) {
         cloudUploadStatus.className = "mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700";
-        cloudUploadStatus.textContent = error.message || "Upload failed";
+        cloudUploadStatus.textContent = err.message || "Upload failed";
         confirmCloudUpload.disabled = false;
         confirmCloudUpload.textContent = "Upload";
       }

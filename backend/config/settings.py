@@ -27,12 +27,12 @@ KGW_THRESHOLD_MM = 2.0
 
 # RealSense D405 intrinsics
 # Replace these with your actual calibrated values
-CAMERA_INTRINSICS = {
-    "fx": 430.0,
-    "fy": 430.0,
-    "cx": 320.0,
-    "cy": 240.0
-}
+# CAMERA_INTRINSICS = {
+#     "fx": 430.0,
+#     "fy": 430.0,
+#     "cx": 320.0,
+#     "cy": 240.0
+# }
 
 # Depth scale:
 # If depth image is uint16 in millimeters, use 1.0

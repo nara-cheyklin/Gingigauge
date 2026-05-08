@@ -18,7 +18,7 @@ function initExport(imageSrc, resultData) {
     const interpretationValue = document.getElementById("interpretationValue");
 
     if (kgwValue) kgwValue.textContent = formatKgw(resultData.kgw_mm);
-    if (confidenceValue) confidenceValue.textContent = (resultData.confidence * 100).toFixed(1) + "%";
+    if (confidenceValue) confidenceValue.textContent = formatConfidence(resultData.confidence);
     if (interpretationValue) interpretationValue.textContent = resultData.interpretation;
   }
 
@@ -45,7 +45,7 @@ function printResult(imageSrc, resultData) {
 
   const rows = resultData ? `
     <tr><th>KGW Measurement</th><td>${formatKgw(resultData.kgw_mm)}</td></tr>
-    <tr><th>Confidence</th><td>${(resultData.confidence * 100).toFixed(1)}%</td></tr>
+    <tr><th>Confidence</th><td>${formatConfidence(resultData.confidence)}</td></tr>
     <tr><th>Interpretation</th><td>${resultData.interpretation}</td></tr>
   ` : "";
 
@@ -98,4 +98,10 @@ function getTimestamp() {
 
 function formatKgw(kgw) {
   return typeof kgw === "number" ? kgw + " mm" : kgw;
+}
+
+function formatConfidence(confidence) {
+  return typeof confidence === "number" && !Number.isNaN(confidence)
+    ? (confidence * 100).toFixed(1) + "%"
+    : "N/A";
 }

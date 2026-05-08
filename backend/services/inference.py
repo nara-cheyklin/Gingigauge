@@ -40,7 +40,22 @@ def image_bytes_to_endpoint_b64(image_bytes):
     return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
-def prediction_to_mask(prediction):
+def _normalize_confidence(value):
+    if value is None:
+        return None
+
+    try:
+        confidence = float(value)
+    except (TypeError, ValueError):
+        return None
+
+    if confidence > 1.0:
+        confidence /= 100.0
+
+    return round(max(0.0, min(confidence, 1.0)), 4)
+
+
+def prediction_to_result(prediction):
     if "mask_b64" not in prediction:
         raise RuntimeError("Vertex AI prediction did not include mask_b64")
 
@@ -48,10 +63,19 @@ def prediction_to_mask(prediction):
     mask_img = Image.open(BytesIO(mask_bytes)).convert("L")
     mask_np = np.array(mask_img)
 
-    return (mask_np > 127).astype(np.uint8)
+    confidence = None
+    for key in ("model_confidence", "confidence", "score", "probability"):
+        confidence = _normalize_confidence(prediction.get(key))
+        if confidence is not None:
+            break
+
+    return {
+        "mask": (mask_np > 127).astype(np.uint8),
+        "confidence": confidence,
+    }
 
 
-def predict_mask_with_endpoint(image_bytes):
+def predict_with_endpoint(image_bytes):
     endpoint = get_endpoint()
     image_b64 = image_bytes_to_endpoint_b64(image_bytes)
     response = endpoint.predict(instances=[{"b64": image_b64}])
@@ -59,14 +83,10 @@ def predict_mask_with_endpoint(image_bytes):
     if not response.predictions:
         raise RuntimeError("Vertex AI endpoint returned no predictions")
 
-    return prediction_to_mask(response.predictions[0])
+    return prediction_to_result(response.predictions[0])
 
 
 def resize_mask_to_original(mask, original_size):
     mask_img = Image.fromarray((mask * 255).astype(np.uint8))
     mask_img = mask_img.resize(original_size, Image.NEAREST)
     return (np.array(mask_img) > 127).astype(np.uint8)
-
-
-def confidence_logic(mask):
-    return round(float(np.mean(mask)), 2)

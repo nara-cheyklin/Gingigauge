@@ -13,22 +13,22 @@ Flow:
 """
 
 import base64
+import logging
 import cv2
 import numpy as np
 import requests
 from io import BytesIO
 from PIL import Image
 
+logger = logging.getLogger(__name__)
+
 from backend.config.settings import (
-    CAMERA_INTRINSICS,
-    DEPTH_UNIT_SCALE,
     KGW_THRESHOLD_MM,
     ROBOFLOW_API_KEY,
 )
 from backend.services.inference import (
-    predict_mask_with_endpoint,
+    predict_with_endpoint,
     resize_mask_to_original,
-    confidence_logic,
 )
 
 _CLAHE_CLIP_LIMIT = 2.0
@@ -158,7 +158,9 @@ def _pixel_to_3d(u: int, v: int, depth: np.ndarray, intr: dict):
     z_raw = float(depth[v, u])
     if z_raw <= 0:
         return None
-    Z = z_raw * intr["depth_scale"]
+    Z = z_raw * intr["depth_scale"]  # mm
+    if Z <= 0:
+        return None
     return np.array([
         (u - intr["ppx"]) * Z / intr["fx"],
         (v - intr["ppy"]) * Z / intr["fy"],
@@ -189,7 +191,7 @@ def _dist_mm(p1: tuple, p2: tuple, depth: np.ndarray, intr: dict):
     P2 = _robust_3d(p2[0], p2[1], depth, intr)
     if P1 is None or P2 is None:
         return None
-    return float(np.linalg.norm(P1 - P2) * 1000.0)
+    return float(np.linalg.norm(P1 - P2))
 
 
 def _measure_pairs(pairs: list, depth: np.ndarray, intr: dict) -> list:
@@ -231,43 +233,81 @@ def _annotate(image_rgb: np.ndarray, measured: list) -> np.ndarray:
 # --- public entry point -------------------------------------------------------
 
 def run_full_pipeline(image_bytes: bytes, depth_map: np.ndarray,
-                      depth_intrinsics: dict = None) -> dict:
+                      depth_intrinsics: dict) -> dict:
     """
     Run the full KGW measurement pipeline.
 
     Args:
-        image_bytes:       Raw bytes of the RGB image (JPEG/PNG).
-        depth_map:         2-D numpy array of depth values aligned to the RGB frame.
-        depth_intrinsics:  Optional dict with keys fx, fy, ppx, ppy, depth_scale.
-                           Falls back to CAMERA_INTRINSICS from settings when omitted.
+        image_bytes:      Raw bytes of the RGB image (JPEG/PNG).
+        depth_map:        2-D numpy array of depth values aligned to the RGB frame.
+        depth_intrinsics: Dict with keys fx, fy, ppx, ppy, depth_scale extracted
+                          from the rosbag's CameraInfo messages.
 
     Returns:
         {
             "kgw_mm":         float | None   (minimum KGW across detected teeth)
-            "confidence":     float           (mean mask confidence 0-1)
+            "confidence":     float | None    (model confidence 0-1, if returned)
             "interpretation": str
             "image_base64":   str             (JPEG annotated image, base64)
             "teeth":          list            (per-tooth measurement detail)
         }
     """
-    intr = depth_intrinsics or {
-        "fx": CAMERA_INTRINSICS["fx"],
-        "fy": CAMERA_INTRINSICS["fy"],
-        "ppx": CAMERA_INTRINSICS["cx"],
-        "ppy": CAMERA_INTRINSICS["cy"],
-        "depth_scale": DEPTH_UNIT_SCALE,
-    }
+    intr = dict(depth_intrinsics)  # local copy so we can adjust depth_scale safely
 
     image = Image.open(BytesIO(image_bytes)).convert("RGB")
     image_rgb = np.array(image)
-    original_size = image.size  # (width, height)
+    original_size = image.size  # (width, height) PIL convention
+
+    # --- depth_scale auto-correction ----------------------------------------
+    depth_scale = intr.get("depth_scale", 1.0)
+    sample_centre = depth_map[depth_map.shape[0] // 2, depth_map.shape[1] // 2]
+    z_centre_mm = float(sample_centre) * depth_scale
+    logger.info("depth_scale=%.6f  depth centre raw=%.1f  Z=%.1f mm",
+                depth_scale, float(sample_centre), z_centre_mm)
+
+    if z_centre_mm > 500.0 and float(sample_centre) > 0:
+        # Bag depth units are likely 0.1 mm/unit (raw ~3000 for 300 mm scene)
+        # while depth_scale defaulted to 1.0.  Shrink by 10x.
+        candidate = depth_scale * 0.1
+        if 50.0 <= float(sample_centre) * candidate <= 500.0:
+            intr["depth_scale"] = candidate
+            depth_scale = candidate
+            z_centre_mm = float(sample_centre) * depth_scale
+            logger.warning("depth_scale auto-corrected to %.6f  (centre Z now %.1f mm)",
+                           depth_scale, z_centre_mm)
+    elif 0 < z_centre_mm < 50.0:
+        # Depth may still be in sub-mm units; try 10x larger scale.
+        candidate = depth_scale * 10.0
+        if 50.0 <= float(sample_centre) * candidate <= 500.0:
+            intr["depth_scale"] = candidate
+            depth_scale = candidate
+            z_centre_mm = float(sample_centre) * depth_scale
+            logger.warning("depth_scale auto-corrected to %.6f  (centre Z now %.1f mm)",
+                           depth_scale, z_centre_mm)
+
+    if not (50.0 <= z_centre_mm <= 500.0):
+        logger.warning("Centre depth Z=%.1f mm is outside 50–500 mm; "
+                       "depth_scale (%.6f) or encoding may still be wrong.",
+                       z_centre_mm, depth_scale)
+
+    # --- guard: depth and image must be the same resolution -----------------
+    img_h, img_w = image_rgb.shape[:2]
+    dep_h, dep_w = depth_map.shape[:2]
+    if img_h != dep_h or img_w != dep_w:
+        raise ValueError(
+            f"depth_map ({dep_w}×{dep_h}) and image ({img_w}×{img_h}) "
+            "must be the same resolution. "
+            "Make sure the bag contains aligned depth "
+            "(/camera/aligned_depth_to_color/image_raw)."
+        )
 
     # CLAHE then GCP segmentation
     clahe_rgb = _apply_clahe(image_rgb)
     clahe_bytes = _ndarray_to_jpeg_bytes(clahe_rgb)
-    mask_small = predict_mask_with_endpoint(clahe_bytes)
+    segmentation = predict_with_endpoint(clahe_bytes)
+    mask_small = segmentation["mask"]
     binary_mask = resize_mask_to_original(mask_small, original_size)
-    confidence = confidence_logic(binary_mask)
+    confidence = segmentation["confidence"]
 
     # tooth detection
     points = _detect_teeth(clahe_rgb)

@@ -1,0 +1,8 @@
+[
+  {
+    "origin": ["https://gingigauge-dd706.web.app", "https://gingigauge-dd706.firebaseapp.com"],
+    "method": ["PUT", "GET", "HEAD", "OPTIONS"],
+    "responseHeader": ["Content-Type", "Content-Length", "x-goog-resumable"],
+    "maxAgeSeconds": 3600
+  }
+]
