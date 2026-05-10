@@ -17,7 +17,7 @@ function initExport(imageSrc, resultData) {
     const healthy = [], atRisk = [], recession = [];
     for (const t of teeth) {
       if (t.inferred_tooth_id && typeof t.kgw_mm === "number") {
-        if (t.kgw_mm >= 3.0) healthy.push(t.inferred_tooth_id);
+        if (t.kgw_mm >= 3.5) healthy.push(t.inferred_tooth_id);
         else if (t.kgw_mm >= 2.0) atRisk.push(t.inferred_tooth_id);
         else recession.push(t.inferred_tooth_id);
       }
@@ -67,7 +67,7 @@ function printResult(imageSrc, resultData) {
     const healthy = [], atRisk = [], recession = [];
     for (const t of teeth) {
       if (t.inferred_tooth_id && typeof t.kgw_mm === "number") {
-        if (t.kgw_mm >= 3.0) healthy.push(t.inferred_tooth_id);
+        if (t.kgw_mm >= 3.5) healthy.push(t.inferred_tooth_id);
         else if (t.kgw_mm >= 2.0) atRisk.push(t.inferred_tooth_id);
         else recession.push(t.inferred_tooth_id);
       }
@@ -185,8 +185,8 @@ function buildDentalChartHTML(teeth, interpretation) {
 
   const legend = `
     <div class="flex flex-wrap gap-4 mt-1 text-xs" style="color:#475569">
-      <span><span style="font-weight:600;color:#15803d">Green</span> — Healthy (≥ 3.0 mm)</span>
-      <span><span style="font-weight:600;color:#f97316">Orange</span> — At Risk (2.0 – 3.0 mm)</span>
+      <span><span style="font-weight:600;color:#15803d">Green</span> — Healthy (≥ 3.5 mm)</span>
+      <span><span style="font-weight:600;color:#f97316">Orange</span> — At Risk (2.0 – 3.5 mm)</span>
       <span><span style="font-weight:600;color:#dc2626">Red</span> — Recession (&lt; 2.0 mm)</span>
     </div>`;
 
@@ -196,7 +196,7 @@ function buildDentalChartHTML(teeth, interpretation) {
 function _toothColorHex(kgw) {
   if (typeof kgw !== "number") return "#bbb";
   if (kgw < 2.0) return "#dc2626";
-  if (kgw < 3.0) return "#f97316";
+  if (kgw < 3.5) return "#f97316";
   return "#15803d";
 }
 
@@ -230,9 +230,9 @@ function buildDentalChartPrint(teeth, interpretation) {
       </div>`;
   }).join("") + `
     <p style="font-size:11px;color:#555;margin-top:10px">
-      <span style="color:#15803d;font-weight:600">Green</span> — Healthy (&ge; 3.0 mm)
+      <span style="color:#15803d;font-weight:600">Green</span> — Healthy (&ge; 3.5 mm)
       &nbsp;&nbsp;
-      <span style="color:#f97316;font-weight:600">Orange</span> — At Risk (2.0 – 3.0 mm)
+      <span style="color:#f97316;font-weight:600">Orange</span> — At Risk (2.0 – 3.5 mm)
       &nbsp;&nbsp;
       <span style="color:#dc2626;font-weight:600">Red</span> — Recession (&lt; 2.0 mm)
     </p>`;
