@@ -23,7 +23,8 @@ ALLOWED_FILE_TYPES = [
     "application/x-bag"
 ]
 
-KGW_THRESHOLD_MM = 2.0
+RECESSION_THRESHOLD = 2.5
+RECESSION_CONCERN_THRESHOLD=3.5
 
 # RealSense D405 intrinsics
 # Replace these with your actual calibrated values

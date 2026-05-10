@@ -97,19 +97,25 @@
             <h3 class="text-left text-lg font-bold text-black">Summary</h3>
             <div class="mt-5 space-y-3">
               <div class="rounded-md border border-slate-200 bg-white p-4">
-                <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">KGW</div>
-                <div id="kgwValue" class="mt-1 text-2xl font-bold text-black"></div>
+                <span class="text-xs font-semibold uppercase tracking-wide" style="color:#15803d">Healthy: </span>
+                <span id="healthyTeeth" class="text-sm font-mono font-semibold" style="color:#15803d"></span>
               </div>
               <div class="rounded-md border border-slate-200 bg-white p-4">
-                <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Confidence</div>
-                <div id="confidenceValue" class="mt-1 text-2xl font-bold text-black"></div>
+                <span class="text-xs font-semibold uppercase tracking-wide" style="color:#f97316">At Risk: </span>
+                <span id="atRiskTeeth" class="text-sm font-mono font-semibold" style="color:#f97316"></span>
               </div>
               <div class="rounded-md border border-slate-200 bg-white p-4">
-                <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Interpretation</div>
-                <div id="interpretationValue" class="mt-1 text-base font-semibold leading-6 text-slate-800"></div>
+                <span class="text-xs font-semibold uppercase tracking-wide" style="color:#dc2626">Recession: </span>
+                <span id="recessionTeeth" class="text-sm font-mono font-semibold" style="color:#dc2626"></span>
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- Per-tooth measurements table -->
+        <div id="teethTableContainer" class="mt-8 hidden">
+          <h3 class="text-left text-lg font-bold text-black mb-3">Per-Tooth Measurements</h3>
+          <div id="teethTableBody"></div>
         </div>
       </div>
     </section>
@@ -233,11 +239,15 @@
       exportContainer.classList.add("hidden");
       exportContainer.style.display = "";
       document.getElementById("outputImage").src = "";
-      document.getElementById("kgwValue").textContent = "";
-      document.getElementById("confidenceValue").textContent = "";
-      document.getElementById("interpretationValue").textContent = "";
+      document.getElementById("healthyTeeth").textContent = "";
+      document.getElementById("atRiskTeeth").textContent = "";
+      document.getElementById("recessionTeeth").textContent = "";
       document.getElementById("downloadBtn").onclick = null;
       document.getElementById("printBtn").onclick = null;
+      const teethContainer = document.getElementById("teethTableContainer");
+      if (teethContainer) teethContainer.classList.add("hidden");
+      const teethBody = document.getElementById("teethTableBody");
+      if (teethBody) teethBody.innerHTML = "";
       await deleteStoredResult();
     }
 
@@ -418,14 +428,13 @@
           alert(detail); return;
         }
 
-        const blob    = await response.blob();
-        const dataUrl = await blobToDataUrl(blob);
-        const kgwRaw  = response.headers.get("X-KGW-MM");
-        const confRaw = response.headers.get("X-Confidence");
+        const data    = await response.json();
+        const dataUrl = "data:image/jpeg;base64," + data.image_base64;
         const resultData = {
-          kgw_mm:         kgwRaw  === "null" ? null : parseFloat(kgwRaw),
-          confidence:     confRaw === "null" ? null : parseFloat(confRaw),
-          interpretation: response.headers.get("X-Interpretation"),
+          kgw_mm:         data.kgw_mm,
+          interpretation: data.interpretation,
+          teeth:          data.teeth  || [],
+          view:           data.view   || "front",
         };
 
         try { await saveStoredResult({ imageSrc: dataUrl, resultData }); } catch {}
@@ -503,14 +512,13 @@
             try { detail = JSON.parse(text).detail; } catch {}
             alert(detail); return;
           }
-          const blob = await response.blob();
-          const dataUrl = await blobToDataUrl(blob);
-          const kgwRaw = response.headers.get("X-KGW-MM");
-          const confRaw = response.headers.get("X-Confidence");
+          const data = await response.json();
+          const dataUrl = "data:image/jpeg;base64," + data.image_base64;
           const resultData = {
-            kgw_mm:         kgwRaw  === "null" ? null : parseFloat(kgwRaw),
-            confidence:     confRaw === "null" ? null : parseFloat(confRaw),
-            interpretation: response.headers.get("X-Interpretation"),
+            kgw_mm:         data.kgw_mm,
+            interpretation: data.interpretation,
+            teeth:          data.teeth  || [],
+            view:           data.view   || "front",
           };
           try { await saveStoredResult({ imageSrc: dataUrl, resultData }); } catch {}
           showResult(dataUrl, resultData, true);

@@ -1,9 +1,8 @@
-import base64
 import os
 from io import BytesIO
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from backend.services.full_pipeline import run_full_pipeline
@@ -97,6 +96,10 @@ class RosbagPredictRequest(BaseModel):
         default=None,
         description="Optional crop region [x, y, w, h] in image pixels.",
     )
+    view: str | None = Field(
+        default=None,
+        description="Dental view: 'front', 'right', or 'left'. Inferred from filename if omitted.",
+    )
 
 
 @router.post("/predict/rosbag")
@@ -123,27 +126,34 @@ async def predict_rosbag(payload: RosbagPredictRequest):
             depth_intrinsics["ppx"] = depth_intrinsics["ppx"] - x
             depth_intrinsics["ppy"] = depth_intrinsics["ppy"] - y
 
+        # Resolve view: explicit payload > inferred from GCS path > default "front"
+        view = payload.view
+        if not view:
+            name = payload.gcs_path.lower()
+            if "front" in name:
+                view = "front"
+            elif "right" in name:
+                view = "right"
+            elif "left" in name:
+                view = "left"
+            else:
+                view = "front"
+
         image_bytes = cv2_to_bytes(rgb_frame)
         result = run_full_pipeline(
             image_bytes=image_bytes,
             depth_map=depth_frame,
             depth_intrinsics=depth_intrinsics,
+            view=view,
         )
 
-        jpg_bytes = base64.b64decode(result["image_base64"])
-
-        headers = {
-            "X-KGW-MM": str(result["kgw_mm"]) if result["kgw_mm"] is not None else "null",
-            "X-Confidence": str(result["confidence"]) if result["confidence"] is not None else "null",
-            "X-Interpretation": result["interpretation"],
-            "Access-Control-Expose-Headers": "X-KGW-MM, X-Confidence, X-Interpretation",
-        }
-
-        return StreamingResponse(
-            BytesIO(jpg_bytes),
-            media_type="image/jpeg",
-            headers=headers,
-        )
+        return JSONResponse({
+            "kgw_mm":         result["kgw_mm"],
+            "interpretation": result["interpretation"],
+            "image_base64":   result["image_base64"],
+            "teeth":          result["teeth"],
+            "view":           result.get("view", "front"),
+        })
 
     except HTTPException:
         raise

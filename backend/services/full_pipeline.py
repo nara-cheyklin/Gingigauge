@@ -6,9 +6,10 @@ Flow:
     -> CLAHE enhancement
     -> GCP Vertex AI segmentation (binary mask)
     -> Roboflow tooth detection
-    -> upper/lower mask split
+    -> upper/lower mask + point split
     -> per-tooth inner/outer boundary
-    -> depth-based mm measurement
+    -> depth-based mm measurement (3 distances per tooth)
+    -> FDI tooth ID mapping
     -> annotated image + JSON output
 """
 
@@ -23,7 +24,8 @@ from PIL import Image
 logger = logging.getLogger(__name__)
 
 from backend.config.settings import (
-    KGW_THRESHOLD_MM,
+    RECESSION_THRESHOLD,
+    RECESSION_CONCERN_THRESHOLD,
     ROBOFLOW_API_KEY,
 )
 from backend.services.inference import (
@@ -35,6 +37,21 @@ _CLAHE_CLIP_LIMIT = 2.0
 _CLAHE_TILE_GRID = (8, 8)
 _X_TOL = 5
 _DEPTH_SEARCH_RADIUS = 2
+
+# --- FDI view config ----------------------------------------------------------
+
+_FRONT_ALLOWED = {
+    "upper": {"18","17","16","15","14","13","12","11","21","22","23","24","25","26","27","28"},
+    "lower": {"48","47","46","45","44","43","42","41","31","32","33","34","35","36","37","38"},
+}
+_RIGHT_ALLOWED = {
+    "upper": {"18","17","16","15","14","13","12","11"},
+    "lower": {"48","47","46","45","44","43","42","41"},
+}
+_LEFT_ALLOWED = {
+    "upper": {"21","22","23","24","25","26","27","28"},
+    "lower": {"31","32","33","34","35","36","37","38"},
+}
 
 
 # --- image helpers ------------------------------------------------------------
@@ -82,8 +99,10 @@ def _detect_teeth(image_rgb: np.ndarray) -> list:
         {
             "cx": int(round(p["x"])),
             "cy": int(round(p["y"])),
-            "class": p["class"],
+            "class": p.get("class", "Tooth"),
             "confidence": float(p["confidence"]),
+            "det_width": float(p.get("width", 0.0)),
+            "det_height": float(p.get("height", 0.0)),
         }
         for p in resp.json().get("predictions", [])
     ]
@@ -124,27 +143,32 @@ def _column_boundary(mask: np.ndarray, cx: int, x_tol: int = _X_TOL):
     return best
 
 
-def _build_pairs(points: list, upper_mask: np.ndarray, lower_mask: np.ndarray) -> list:
+def _split_points_upper_lower(points: list):
     if not points:
-        return []
+        return [], []
+    ys = sorted(p["cy"] for p in points)
+    median_y = ys[len(ys) // 2]
+    return [p for p in points if p["cy"] < median_y], [p for p in points if p["cy"] >= median_y]
 
-    median_y = sorted(p["cy"] for p in points)[len(points) // 2]
+
+def _build_pairs(points: list, upper_mask: np.ndarray, lower_mask: np.ndarray) -> list:
+    upper_pts, lower_pts = _split_points_upper_lower(points)
     pairs = []
 
-    for pt in points:
-        is_upper = pt["cy"] < median_y
-        hit = _column_boundary(upper_mask if is_upper else lower_mask, pt["cx"])
-        if hit is None:
-            continue
-        x, top_y, bot_y = hit
-        pairs.append({
-            "group": "upper" if is_upper else "lower",
-            "tooth_point": (pt["cx"], pt["cy"]),
-            "inner_point": (x, bot_y if is_upper else top_y),
-            "outer_point": (x, top_y if is_upper else bot_y),
-            "class": pt["class"],
-            "confidence": pt["confidence"],
-        })
+    for group, pts, mask in (("upper", upper_pts, upper_mask), ("lower", lower_pts, lower_mask)):
+        for pt in pts:
+            hit = _column_boundary(mask, pt["cx"])
+            if hit is None:
+                continue
+            x, top_y, bot_y = hit
+            pairs.append({
+                "group": group,
+                "tooth_point": (pt["cx"], pt["cy"]),
+                "inner_point": (x, bot_y if group == "upper" else top_y),
+                "outer_point": (x, top_y if group == "upper" else bot_y),
+                "class": pt["class"],
+                "confidence": pt["confidence"],
+            })
 
     return pairs
 
@@ -197,7 +221,9 @@ def _dist_mm(p1: tuple, p2: tuple, depth: np.ndarray, intr: dict):
 def _measure_pairs(pairs: list, depth: np.ndarray, intr: dict) -> list:
     measured = []
     for idx, pair in enumerate(pairs):
-        kgw = _dist_mm(pair["inner_point"], pair["outer_point"], depth, intr)
+        tooth_to_inner = _dist_mm(pair["tooth_point"], pair["inner_point"], depth, intr)
+        tooth_to_outer = _dist_mm(pair["tooth_point"], pair["outer_point"], depth, intr)
+        inner_to_outer = _dist_mm(pair["inner_point"], pair["outer_point"], depth, intr)
         measured.append({
             "index": idx,
             "group": pair["group"],
@@ -206,9 +232,93 @@ def _measure_pairs(pairs: list, depth: np.ndarray, intr: dict) -> list:
             "tooth_point": list(pair["tooth_point"]),
             "inner_point": list(pair["inner_point"]),
             "outer_point": list(pair["outer_point"]),
-            "kgw_mm": round(kgw, 2) if kgw is not None else None,
+            "tooth_to_inner_mm": round(tooth_to_inner, 2) if tooth_to_inner is not None else None,
+            "tooth_to_outer_mm": round(tooth_to_outer, 2) if tooth_to_outer is not None else None,
+            "inner_to_outer_mm": round(inner_to_outer, 2) if inner_to_outer is not None else None,
+            "kgw_mm": round(inner_to_outer, 2) if inner_to_outer is not None else None,
         })
     return measured
+
+
+# --- FDI tooth mapping --------------------------------------------------------
+
+def _map_front_view(pairs: list, image_shape: tuple) -> dict:
+    h, w = image_shape[:2]
+    cx, cy = w / 2.0, h / 2.0
+
+    groups: dict = {"ul": [], "ur": [], "ll": [], "lr": []}
+    for p in pairs:
+        x, y = p["tooth_point"]
+        key = ("u" if y < cy else "l") + ("l" if x < cx else "r")
+        groups[key].append(p)
+
+    def sort_key(p):
+        return (abs(p["tooth_point"][0] - cx), abs(p["tooth_point"][1] - cy))
+
+    for g in groups.values():
+        g.sort(key=sort_key)
+
+    seqs = {
+        "ul": ["11","12","13","14","15","16","17","18"],
+        "ur": ["21","22","23","24","25","26","27","28"],
+        "ll": ["41","42","43","44","45","46","47","48"],
+        "lr": ["31","32","33","34","35","36","37","38"],
+    }
+    mapping = {}
+    for key, seq in seqs.items():
+        for i, p in enumerate(groups[key]):
+            if i < len(seq):
+                mapping[p["index"]] = seq[i]
+    return mapping
+
+
+def _center_align_sequence(sorted_pairs: list, sequence: list) -> dict:
+    n, m = len(sorted_pairs), len(sequence)
+    if n <= 0:
+        return {}
+    if n >= m:
+        return {p["index"]: t for p, t in zip(sorted_pairs[:m], sequence)}
+    offset = max(0, (m - n) // 2)
+    return {p["index"]: t for p, t in zip(sorted_pairs, sequence[offset:offset + n])}
+
+
+def _map_side_view(pairs: list, view: str) -> dict:
+    mapping = {}
+    for group in ("upper", "lower"):
+        gps = sorted([p for p in pairs if p["group"] == group], key=lambda p: p["tooth_point"][0])
+        if view == "right":
+            seq = (["18","17","16","15","14","13","12","11"] if group == "upper"
+                   else ["48","47","46","45","44","43","42","41"])
+        else:
+            seq = (["21","22","23","24","25","26","27","28"] if group == "upper"
+                   else ["31","32","33","34","35","36","37","38"])
+        mapping.update(_center_align_sequence(gps, seq))
+    return mapping
+
+
+def _filter_by_view(pairs: list, mapping: dict, view: str) -> dict:
+    allowed = {"front": _FRONT_ALLOWED, "right": _RIGHT_ALLOWED, "left": _LEFT_ALLOWED}.get(view)
+    if allowed is None:
+        return mapping
+    return {
+        p["index"]: mapping[p["index"]]
+        for p in pairs
+        if p["index"] in mapping and mapping[p["index"]] in allowed.get(p["group"], set())
+    }
+
+
+def _assign_tooth_ids(pairs: list, view: str, image_shape: tuple) -> list:
+    if view in ("front", "unknown", None):
+        raw_map = _map_front_view(pairs, image_shape)
+    else:
+        raw_map = _map_side_view(pairs, view)
+    filtered_map = _filter_by_view(pairs, raw_map, view or "front")
+    return [
+        dict(p,
+             inferred_tooth_id=filtered_map.get(p["index"]),
+             inferred_tooth_id_raw=raw_map.get(p["index"]))
+        for p in pairs
+    ]
 
 
 # --- annotation ---------------------------------------------------------------
@@ -218,41 +328,41 @@ def _annotate(image_rgb: np.ndarray, measured: list) -> np.ndarray:
     for pair in measured:
         ix, iy = pair["inner_point"]
         ox, oy = pair["outer_point"]
-        cv2.line(canvas, (ix, iy), (ox, oy), (0, 200, 255), 2)
-        cv2.circle(canvas, (ix, iy), 4, (0, 255, 0), -1)
-        cv2.circle(canvas, (ox, oy), 4, (0, 255, 0), -1)
-        if pair["kgw_mm"] is not None:
-            cv2.putText(
-                canvas, f"{pair['kgw_mm']:.1f}mm",
-                (ox + 4, oy - 4),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA,
-            )
+        tooth_id = pair.get("inferred_tooth_id")
+
+        cv2.circle(canvas, (ix, iy), 4, (0, 0, 255), -1)    # red: inner border
+        cv2.circle(canvas, (ox, oy), 4, (255, 255, 0), -1)  # yellow: outer border
+        cv2.line(canvas, (ix, iy), (ox, oy), (0, 255, 0), 2)
+
+        label = str(tooth_id) if tooth_id else str(pair["index"])
+        cv2.putText(canvas, label, (ix + 5, iy + 5),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
     return canvas
 
 
 # --- public entry point -------------------------------------------------------
 
 def run_full_pipeline(image_bytes: bytes, depth_map: np.ndarray,
-                      depth_intrinsics: dict) -> dict:
+                      depth_intrinsics: dict, view: str = "front") -> dict:
     """
     Run the full KGW measurement pipeline.
 
     Args:
         image_bytes:      Raw bytes of the RGB image (JPEG/PNG).
         depth_map:        2-D numpy array of depth values aligned to the RGB frame.
-        depth_intrinsics: Dict with keys fx, fy, ppx, ppy, depth_scale extracted
-                          from the rosbag's CameraInfo messages.
+        depth_intrinsics: Dict with keys fx, fy, ppx, ppy, depth_scale.
+        view:             Dental view — 'front', 'right', or 'left'.
 
     Returns:
         {
             "kgw_mm":         float | None   (minimum KGW across detected teeth)
-            "confidence":     float | None    (model confidence 0-1, if returned)
             "interpretation": str
             "image_base64":   str             (JPEG annotated image, base64)
             "teeth":          list            (per-tooth measurement detail)
+            "view":           str
         }
     """
-    intr = dict(depth_intrinsics)  # local copy so we can adjust depth_scale safely
+    intr = dict(depth_intrinsics)  # local copy — depth_scale may be adjusted below
 
     image = Image.open(BytesIO(image_bytes)).convert("RGB")
     image_rgb = np.array(image)
@@ -266,8 +376,7 @@ def run_full_pipeline(image_bytes: bytes, depth_map: np.ndarray,
                 depth_scale, float(sample_centre), z_centre_mm)
 
     if z_centre_mm > 500.0 and float(sample_centre) > 0:
-        # Bag depth units are likely 0.1 mm/unit (raw ~3000 for 300 mm scene)
-        # while depth_scale defaulted to 1.0.  Shrink by 10x.
+        # Bag depth likely in 0.1 mm/unit (raw ~3000 for 300 mm) — shrink by 10×
         candidate = depth_scale * 0.1
         if 50.0 <= float(sample_centre) * candidate <= 500.0:
             intr["depth_scale"] = candidate
@@ -276,7 +385,6 @@ def run_full_pipeline(image_bytes: bytes, depth_map: np.ndarray,
             logger.warning("depth_scale auto-corrected to %.6f  (centre Z now %.1f mm)",
                            depth_scale, z_centre_mm)
     elif 0 < z_centre_mm < 50.0:
-        # Depth may still be in sub-mm units; try 10x larger scale.
         candidate = depth_scale * 10.0
         if 50.0 <= float(sample_centre) * candidate <= 500.0:
             intr["depth_scale"] = candidate
@@ -307,7 +415,6 @@ def run_full_pipeline(image_bytes: bytes, depth_map: np.ndarray,
     segmentation = predict_with_endpoint(clahe_bytes)
     mask_small = segmentation["mask"]
     binary_mask = resize_mask_to_original(mask_small, original_size)
-    confidence = segmentation["confidence"]
 
     # tooth detection
     points = _detect_teeth(clahe_rgb)
@@ -320,20 +427,23 @@ def run_full_pipeline(image_bytes: bytes, depth_map: np.ndarray,
         upper_mask, lower_mask = _split_upper_lower(binary_mask * 255)
         pairs = _build_pairs(points, upper_mask, lower_mask)
         measured = _measure_pairs(pairs, depth_map, intr)
+        measured = _assign_tooth_ids(measured, view, image_rgb.shape)
         valid = [m["kgw_mm"] for m in measured if m["kgw_mm"] is not None]
         kgw_mm = round(min(valid), 2) if valid else None
 
     if kgw_mm is None:
         interpretation = "Insufficient tooth detection for measurement"
-    elif kgw_mm >= KGW_THRESHOLD_MM:
-        interpretation = "Adequate keratinized gingiva width"
+    elif kgw_mm < RECESSION_THRESHOLD:
+        interpretation = "Recession"
+    elif kgw_mm>= RECESSION_THRESHOLD and kgw_mm < RECESSION_CONCERN_THRESHOLD:
+        interpretation = "At Risk"
     else:
-        interpretation = "Inadequate keratinized gingiva width"
+        interpretation = "Healthy"
 
     return {
         "kgw_mm": kgw_mm,
-        "confidence": confidence,
         "interpretation": interpretation,
         "image_base64": _ndarray_to_base64_jpeg(_annotate(image_rgb, measured)),
         "teeth": measured,
+        "view": view,
     }
