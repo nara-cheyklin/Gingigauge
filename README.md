@@ -150,8 +150,6 @@ VERTEX_REGION=us-central1
 ROBOFLOW_API_KEY=your-roboflow-api-key
 ```
 
-> **Never commit `.env` to the repository.** It is listed in `.gitignore`.
-
 ### 3. Run the backend
 
 ```bash
