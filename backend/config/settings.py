@@ -24,7 +24,7 @@ ALLOWED_FILE_TYPES = [
 ]
 
 RECESSION_THRESHOLD = 2.0
-RECESSION_CONCERN_THRESHOLD=3.5
+RECESSION_CONCERN_THRESHOLD=3.0
 
 # RealSense D405 intrinsics
 # Replace these with your actual calibrated values
