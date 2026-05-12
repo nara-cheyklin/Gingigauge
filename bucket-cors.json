@@ -1,6 +1,6 @@
 [
   {
-    "origin": ["https://gingigauge-dd706.web.app", "https://YOUR_FIREBASE_PROJECT.firebaseapp.com"],
+    "origin": ["https://gingigauge-dd706.web.app", "CLOUD_RUN_URL"],
     "method": ["PUT", "GET", "HEAD", "OPTIONS"],
     "responseHeader": ["Content-Type", "Content-Length", "x-goog-resumable"],
     "maxAgeSeconds": 3600
